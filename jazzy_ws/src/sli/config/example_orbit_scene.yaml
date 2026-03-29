@@ -1,0 +1,24 @@
+#example orbit config file yaml
+
+scene:
+  usd_path: /path/to/usd
+  attractor_prim: /World/Earth
+
+bodies:
+  - prim_path: /World/Cube
+    orbit_type: circular
+    radius: 25.0
+    plane: xy
+    mu: 980.665
+    dt_sim: 0.00833
+
+  - prim_path: /World/Cube2
+    orbit_type: elements
+    a: 30.0
+    e: 0.1
+    inc_deg: 45.0
+    raan_deg: 0.0
+    argp_deg: 0.0
+    nu_deg: 0.0
+    mu: 980.665
+    dt_sim: 0.00833
