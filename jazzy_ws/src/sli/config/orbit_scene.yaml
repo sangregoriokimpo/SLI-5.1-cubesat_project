@@ -1,0 +1,17 @@
+scene:
+  usd_path: usd_files/earth/earthmodel.usd
+  attractor_prim: /World/Cesium_World_Terrain
+  ext_paths:
+    - ~/.local/share/ov/data/Kit/Isaac-Sim Full/5.1/exts/3
+    - ~/.local/share/ov/data/exts/v2
+  extensions:
+    - cesium.usd.plugins
+    - cesium.omniverse
+
+bodies:
+  - prim_path: /World/Cube
+    orbit_type: circular
+    radius: 6771000.0
+    plane: xy
+    mu: 398600441800000.0
+    dt_sim: 1.0

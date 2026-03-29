@@ -67,6 +67,9 @@ jazzy_ws/src/sli/launch/orbit.launch.py
 ## Launch
 ```bash
 source IsaacSim-5.1-ROS2_workspace/build_ws/jazzy/isaac_sim_ros_ws/install/local_setup.bash
+# or
+source ~/SLI-5.1-cubesat_project/IsaacSim-5.1-ROS2_workspace/build_ws/jazzy/isaac_sim_ros_ws/install/local_setup.bash
+
 ros2 launch sli orbit.launch.py
 ```
 
