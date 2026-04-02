@@ -1,0 +1,16 @@
+string prim_path
+string attractor_path
+float64 mu
+float64 dt_sim
+string orbit_type
+float64 radius
+string plane
+float64 a
+float64 e
+float64 inc_deg
+float64 raan_deg
+float64 argp_deg
+float64 nu_deg
+---
+bool success
+string message
