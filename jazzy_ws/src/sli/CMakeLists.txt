@@ -27,4 +27,17 @@ install(DIRECTORY launch config scripts usd_files
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS scripts/scene_loader_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME scene_loader_node
+)
+install(PROGRAMS scripts/orbit_vel_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME orbit_vel_node
+)
+install(PROGRAMS scripts/isaac_bridge_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME isaac_bridge_node
+)
+
 ament_package()

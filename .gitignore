@@ -25,3 +25,7 @@ humble_ws/src/isaac_tutorials
 humble_ws/src/isaacsim
 humble_ws/src/moveit
 humble_ws/src/navigation
+
+IsaacSim-5.1-ROS2_workspace/jazzy_ws/build/
+IsaacSim-5.1-ROS2_workspace/jazzy_ws/install/
+IsaacSim-5.1-ROS2_workspace/jazzy_ws/log/

@@ -13,7 +13,27 @@
   <test_depend>ament_lint_common</test_depend>
   <depend>isaacsim</depend>
 
+  <!-- Python runtime -->
+  <exec_depend>python3</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+ 
+  <!-- ROS2 core -->
+  <exec_depend>rclpy</exec_depend>
+ 
+  <!-- Message/service packages -->
+  <exec_depend>orbit_interfaces</exec_depend>
+  <exec_depend>simulation_interfaces</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+ 
+  <!-- Launch -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+ 
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
+  
   <export>
     <build_type>ament_cmake</build_type>
   </export>
