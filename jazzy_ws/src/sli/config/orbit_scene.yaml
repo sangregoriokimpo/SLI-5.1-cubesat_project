@@ -1,17 +1,58 @@
-scene:
-  usd_path: usd_files/earth/earthmodel.usd
-  attractor_prim: /World/Cesium_World_Terrain
-  ext_paths:
-    - ~/.local/share/ov/data/Kit/Isaac-Sim Full/5.1/exts/3
-    - ~/.local/share/ov/data/exts/v2
-  extensions:
-    - cesium.usd.plugins
-    - cesium.omniverse
+# orbit_scene.yaml
+# Workspace root is resolved from env var ORBIT_WS,
+# falling back to the directory containing this file.
+workspace_root: ${ORBIT_WS}
+
+world:
+  # Loaded via /load_world at startup.
+  # Path is relative to workspace_root.
+  base_scene: usd_files/earth/earthmodel.usd
+
+simulation:
+  mu: 398600.4418      # km³/s²  (real Earth)
+  dt_sim: 0.00833      # ~1/120 s
 
 bodies:
-  - prim_path: /World/Cube
-    orbit_type: circular
-    radius: 6771000.0
-    plane: xy
-    mu: 398600441800000.0
-    dt_sim: 1.0
+
+  - name: earth
+    prim_path: /World/Earth
+    role: attractor      # anchor only, not simulated
+    spawn: false         # already present in base_scene
+
+  - name: sat1
+    prim_path: /World/Sat1
+    role: orbit
+    spawn: true
+    usd: NASA/Ingenuity/ingenuity.usd   # resolved by Isaac Sim asset root
+    attractor: /World/Earth
+    orbit:
+      type: circular
+      radius: 6778.0    # km  (LEO ~400km above Earth surface)
+      plane: xy
+
+  - name: sat2
+    prim_path: /World/Sat2
+    role: orbit
+    spawn: true
+    usd: NASA/Ingenuity/ingenuity.usd
+    attractor: /World/Earth
+    orbit:
+      type: elements
+      a: 6778.0         # semi-major axis km
+      e: 0.01           # eccentricity
+      inc: 28.5         # inclination deg
+      raan: 0.0         # right ascension of ascending node deg
+      argp: 0.0         # argument of periapsis deg
+      nu: 45.0          # true anomaly deg
+
+  - name: sat3
+    prim_path: /World/Sat3
+    role: cw             # Clohessy-Wiltshire deputy
+    spawn: true
+    usd: NASA/Ingenuity/ingenuity.usd
+    attractor: /World/Earth
+    chief: /World/Sat1   # follows sat1 in LVLH frame
+    orbit:
+      type: cw_relative
+      dr: [1.0, 0.0, 0.5]    # initial relative position km
+      dv: [0.0, 0.001, 0.0]  # initial relative velocity km/s
