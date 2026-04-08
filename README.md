@@ -133,6 +133,8 @@ source install/local_setup.bash
 
 ## Running
 
+# MAY TAKE A FEW ATTEMPTS TO LAUNCH THE LAUNCH FILE, DUE TO CESIUM AND ISAAC SIM APIs BEING HARD TO WORK WITH
+
 ### Terminal 1 — Isaac Sim
 
 ```bash
