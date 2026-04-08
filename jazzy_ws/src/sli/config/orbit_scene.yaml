@@ -23,7 +23,7 @@ bodies:
     prim_path: /World/Sat1
     role: orbit
     spawn: true
-    usd: NASA/Ingenuity/ingenuity.usd   # resolved by Isaac Sim asset root
+    usd: jazzy_ws/src/sli/urdf/bigsat/bigsat.usd  # resolved by Isaac Sim asset root
     attractor: /World/Earth
     orbit:
       type: circular
@@ -34,7 +34,7 @@ bodies:
     prim_path: /World/Sat2
     role: orbit
     spawn: true
-    usd: NASA/Ingenuity/ingenuity.usd
+    usd: jazzy_ws/src/sli/urdf/smallsat/smallsat.usd
     attractor: /World/Earth
     orbit:
       type: elements
@@ -49,7 +49,7 @@ bodies:
     prim_path: /World/Sat3
     role: cw             # Clohessy-Wiltshire deputy
     spawn: true
-    usd: NASA/Ingenuity/ingenuity.usd
+    usd: jazzy_ws/src/sli/urdf/smallsat/smallsat.usd
     attractor: /World/Earth
     chief: /World/Sat1   # follows sat1 in LVLH frame
     orbit:

@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<robot name="bigsat">
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="bigsat_white">
+        <color rgba="0.9 0.9 0.9 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="100.0"/>
+      <!-- Inertia of solid cube: I = (1/6) * m * a^2 -->
+      <!-- I = (1/6) * 100 * 1.0^2 = 16.667 -->
+      <inertia ixx="16.667" ixy="0.0" ixz="0.0"
+                             iyy="16.667" iyz="0.0"
+                                          izz="16.667"/>
+    </inertial>
+  </link>
+</robot>
