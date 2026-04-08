@@ -156,7 +156,7 @@ def generate_nodes(context, *args, **kwargs):
 
         # ---- isaac_bridge_node (one per simulated body) ----
         if role in ("orbit", "cw"):
-            state_topic = "orbit_state" if role == "orbit" else "cw_state"
+            state_topic = "orbit_state"   # both orbit_vel_node and cw_node publish here
             nodes.append(
                 Node(
                     package="sli",
@@ -168,9 +168,7 @@ def generate_nodes(context, *args, **kwargs):
                         "prim_path":      body["prim_path"],
                         "state_topic":    state_topic,
                         "attractor_path": body.get("attractor", "/World/Earth"),
-                        # km → scene units. If earthmodel.usd is in km, use 1.0.
-                        # If scene is in meters, use 1000.0.
-                        "scale":          1.0,
+                        "scale":          float(body.get("scale", 1000.0)),
                     }],
                 )
             )
