@@ -125,13 +125,34 @@ def generate_nodes(context, *args, **kwargs):
 
         # ---- cw_node (role: cw) — placeholder ----
         elif role == "cw":
-            # TODO: implement cw_node
-            # For now, skip with a warning printed at launch time
-            print(
-                f"[orbit.launch] WARNING: CW node for '{name}' not yet "
-                f"implemented — skipping."
+            chief_prim = body.get("chief", "")
+            # Convert /World/Sat1 → sat1 to derive the chief's topic namespace
+            chief_ns = chief_prim.split("/")[-1].lower()
+            chief_topic = f"/{chief_ns}/orbit_state"
+            orbit = body.get("orbit", {})
+            dr = orbit.get("dr", [0.0, 0.0, 0.0])
+            dv = orbit.get("dv", [0.0, 0.0, 0.0])
+            nodes.append(
+                Node(
+                    package="sli",
+                    executable="cw_node",
+                    name=f"cw_{name}",
+                    namespace=name,
+                    output="screen",
+                    parameters=[{
+                        "mu":           sim_cfg.get("mu", 398600.4418),
+                        "dt_sim":       sim_cfg.get("dt_sim", 0.00833),
+                        "prim_path":    body["prim_path"],
+                        "chief_topic":  chief_topic,
+                        "dr_x":         float(dr[0]),
+                        "dr_y":         float(dr[1]),
+                        "dr_z":         float(dr[2]),
+                        "dv_x":         float(dv[0]),
+                        "dv_y":         float(dv[1]),
+                        "dv_z":         float(dv[2]),
+                    }],
+                )
             )
-            continue
 
         # ---- isaac_bridge_node (one per simulated body) ----
         if role in ("orbit", "cw"):

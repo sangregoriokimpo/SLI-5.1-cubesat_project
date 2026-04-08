@@ -39,5 +39,9 @@ install(PROGRAMS scripts/isaac_bridge_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME isaac_bridge_node
 )
+install(PROGRAMS scripts/cw_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME cw_node
+)
 
 ament_package()
