@@ -5,10 +5,7 @@
 
 Sierra Lobo Inc, CubeSat orbital mechanics simulation using NVIDIA Isaac Sim 5.1 and ROS2 Jazzy. Physics runs as pure ROS2 nodes outside Isaac Sim. Isaac Sim is used as a renderer only, controlled via the `simulation_interfaces` standard.
 
-<video controls width="800">
-  <source src="./Screencast%20from%202026-04-08%2014-18-51.webm" type="video/webm">
-  Your browser does not support the video tag.
-</video>
+![cubesats](image.png)
 
 ![rqt](rosgraphSLI0.png)
 
