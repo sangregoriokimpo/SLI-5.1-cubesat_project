@@ -1,58 +1,56 @@
-# orbit_scene.yaml
-# Workspace root is resolved from env var ORBIT_WS,
-# falling back to the directory containing this file.
 workspace_root: ${ORBIT_WS}
 
 world:
-  # Loaded via /load_world at startup.
-  # Path is relative to workspace_root.
   base_scene: usd_files/earth/earthmodel.usd
 
 simulation:
-  mu: 398600.4418      # km³/s²  (real Earth)
+  mu: 398600.4418      # km³/s²
   dt_sim: 0.00833      # ~1/120 s
 
 bodies:
 
   - name: earth
     prim_path: /World/Earth
-    role: attractor      # anchor only, not simulated
-    spawn: false         # already present in base_scene
+    role: attractor
+    spawn: false
 
   - name: sat1
     prim_path: /World/Sat1
     role: orbit
     spawn: true
-    usd: jazzy_ws/src/sli/urdf/bigsat/bigsat.usd  # resolved by Isaac Sim asset root
+    usd: urdf/bigsat/bigsat.usd
     attractor: /World/Earth
     orbit:
       type: circular
-      radius: 6778.0    # km  (LEO ~400km above Earth surface)
+      radius: 6778000   
       plane: xy
+    scale: 1000.0       
 
   - name: sat2
     prim_path: /World/Sat2
     role: orbit
     spawn: true
-    usd: jazzy_ws/src/sli/urdf/smallsat/smallsat.usd
+    usd: urdf/smallsat/smallsat.usd
     attractor: /World/Earth
     orbit:
       type: elements
-      a: 6778.0         # semi-major axis km
-      e: 0.01           # eccentricity
-      inc: 28.5         # inclination deg
-      raan: 0.0         # right ascension of ascending node deg
-      argp: 0.0         # argument of periapsis deg
-      nu: 45.0          # true anomaly deg
+      a: 6778000
+      e: 0.01
+      inc: 28.5
+      raan: 0.0
+      argp: 0.0
+      nu: 45.0
+    scale: 1000.0
 
   - name: sat3
     prim_path: /World/Sat3
-    role: cw             # Clohessy-Wiltshire deputy
+    role: cw
     spawn: true
-    usd: jazzy_ws/src/sli/urdf/smallsat/smallsat.usd
+    usd: urdf/smallsat/smallsat.usd
     attractor: /World/Earth
-    chief: /World/Sat1   # follows sat1 in LVLH frame
+    chief: /World/Sat1
     orbit:
       type: cw_relative
-      dr: [1.0, 0.0, 0.5]    # initial relative position km
-      dv: [0.0, 0.001, 0.0]  # initial relative velocity km/s
+      dr: [1.0, 0.0, 0.5]
+      dv: [0.0, 0.001, 0.0]
+    scale: 1000.0
