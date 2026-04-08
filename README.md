@@ -202,7 +202,7 @@ bodies:
       type: circular
       radius: 6778000
       plane: xy
-    scale: 1000.0       # km→m conversion for Isaac Sim
+    scale: 1.0       
 
   - name: sat2
     prim_path: /World/Sat2
@@ -218,7 +218,7 @@ bodies:
       raan: 0.0
       argp: 0.0
       nu: 45.0
-    scale: 1000.0
+    scale: 1.0
 
   - name: sat3
     prim_path: /World/Sat3
@@ -231,7 +231,7 @@ bodies:
       type: cw_relative
       dr: [1.0, 0.0, 0.5]    # initial relative pos LVLH frame (km)
       dv: [0.0, 0.001, 0.0]  # initial relative vel LVLH frame (km/s)
-    scale: 1000.0
+    scale: 1.0
 ```
 
 ---
