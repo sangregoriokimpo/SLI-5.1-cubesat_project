@@ -148,7 +148,7 @@ cd ~/SLI-5.1-cubesat_project/jazzy_ws
 colcon build
 ```
 
-### 3. Generate satellite USD files (one-time, in Isaac Sim Script Editor)
+<!-- ### 3. Generate satellite USD files (one-time, in Isaac Sim Script Editor)
 
 Open Isaac Sim, go to `Window → Script Editor`, run:
 
@@ -181,11 +181,11 @@ print("Done")
 Then rebuild:
 ```bash
 colcon build --packages-select sli
-```
+``` -->
 
 ---
 
-## Running
+## 3. Running
 
 ### Terminal 1 — Isaac Sim
 
