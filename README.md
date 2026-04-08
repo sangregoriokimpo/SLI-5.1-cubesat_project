@@ -7,6 +7,8 @@ Sierra Lobo Inc, CubeSat orbital mechanics simulation using NVIDIA Isaac Sim 5.1
 
 ![cubesats](image.png)
 
+![rqt](rosgraphSLI0.png)
+
 ---
 
 ## Architecture
