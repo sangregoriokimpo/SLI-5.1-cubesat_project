@@ -14,7 +14,7 @@ jazzy_ws/src/custom_message
 jazzy_ws/src/humanoid_locomotion_policy_example
 jazzy_ws/src/isaac_ros2_messages
 jazzy_ws/src/isaac_tutorials
-jazzy_ws/src/isaacsim
+#jazzy_ws/src/isaacsim
 jazzy_ws/src/moveit
 jazzy_ws/src/navigation
 humble_ws/src/ackermann_control
