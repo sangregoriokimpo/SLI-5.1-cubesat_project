@@ -9,6 +9,8 @@ Sierra Lobo Inc, CubeSat orbital mechanics simulation using NVIDIA Isaac Sim 5.1
 
 ![rqt](rosgraphSLI0.png)
 
+
+
 ---
 
 ## Architecture
@@ -27,14 +29,14 @@ External ROS2 process (Python 3.12, system Jazzy)
 │    subscribes orbit_state → /set_entity_state    │
 │                                                  │
 │  scene_loader_node  (runs once at startup)       │
-│    /load_world → /spawn_entity → /play → exits   │
+│    /spawn_entity → /play → exits                 │
 └─────────────────────────────────────────────────┘
               │  ROS2 DDS (FastRTPS)
               ▼
 Isaac Sim process (Python 3.11, internal Jazzy)
 ┌─────────────────────────────────────────────────┐
 │  isaacsim.ros2.sim_control extension             │
-│    /load_world  /spawn_entity  /set_entity_state │
+│    /spawn_entity  /set_entity_state              │
 │    /set_simulation_state  /get_entities  ...     │
 └─────────────────────────────────────────────────┘
 ```
@@ -53,6 +55,7 @@ SLI-5.1-cubesat_project/
 ├── jazzy_ws/                       # Host workspace (Python 3.12, for ROS2 nodes)
 │   ├── fastdds.xml                 # FastDDS UDP config (required)
 │   └── src/
+│       ├── isaacsim/               # NVIDIA Isaac Sim ROS2 launcher package
 │       ├── orbit_interfaces/       # Custom ROS2 messages
 │       │   └── msg/
 │       │       ├── OrbitState.msg
@@ -74,40 +77,14 @@ SLI-5.1-cubesat_project/
 │           │       └── earthmodel.usd
 │           └── urdf/
 │               ├── bigsat/
-│               │   ├── bigsat.urdf
-│               │   └── bigsat.usd   (generated — see Setup)
+│               │   └── bigsat.usd
 │               └── smallsat/
-│                   ├── smallsat.urdf
-│                   └── smallsat.usd (generated — see Setup)
+│                   └── smallsat.usd
 └── build_ws/                       # Docker build output (Python 3.11 binaries)
     └── jazzy/
         ├── jazzy_ws/install/       # Source before running Isaac Sim
         └── isaac_sim_ros_ws/install/
 ```
-
----
-
-## Message Definitions
-
-### `orbit_interfaces/msg/OrbitState`
-```
-std_msgs/Header header
-string body_id               # USD prim path used as identifier
-geometry_msgs/Vector3 position   # km, inertial frame, relative to attractor
-geometry_msgs/Vector3 velocity   # km/s, inertial frame
-geometry_msgs/Quaternion attitude
-```
-
-### `orbit_interfaces/msg/ThrustCmd`
-```
-std_msgs/Header header
-string body_id
-float64 throttle             # acceleration magnitude km/s²
-float64 gimbal_pitch         # thrust direction angle (rad) from XY plane
-float64 gimbal_yaw           # thrust direction angle (rad) in XY plane from +X
-```
-
-Thrust direction convention: `pitch=0, yaw=π/2` = prograde for xy-plane circular orbit.
 
 ---
 
@@ -119,14 +96,13 @@ Thrust direction convention: `pitch=0, yaw=π/2` = prograde for xy-plane circula
 - Docker (for building Python 3.11 custom message binaries)
 - NVIDIA Isaac Sim 5.1 (workstation install at `/isaac-sim`)
 - ROS2 Jazzy (system apt install, Python 3.12)
-- Conda environment `env_isaaclab` with Isaac Sim dependencies
 
 ### ROS2 packages
 ```bash
 sudo apt install ros-jazzy-simulation-interfaces
 ```
 
-Note: Isaac Sim bundles `simulation_interfaces` version **1.1.0** internally. The apt package is 1.2.0 which causes a crash. The fix is to set `LD_LIBRARY_PATH` to use Isaac Sim's bundled version before launching (see Running section).
+> **Important:** `simulation_interfaces` must be the system apt version. Do **not** build it from source into `jazzy_ws` — Isaac Sim's internal `.so` files are compiled against the apt version and will crash with any other build.
 
 ---
 
@@ -150,74 +126,41 @@ Output at:
 source /opt/ros/jazzy/setup.bash
 cd ~/SLI-5.1-cubesat_project/jazzy_ws
 colcon build
+source install/local_setup.bash
 ```
-
-<!-- ### 3. Generate satellite USD files (one-time, in Isaac Sim Script Editor)
-
-Open Isaac Sim, go to `Window → Script Editor`, run:
-
-```python
-from pxr import Usd, UsdGeom, Gf
-
-# bigsat — 1m cube
-stage = Usd.Stage.CreateNew(
-    "/home/sgq/SLI-5.1-cubesat_project/jazzy_ws/src/sli/urdf/bigsat/bigsat.usd"
-)
-xform = UsdGeom.Xform.Define(stage, "/bigsat")
-cube = UsdGeom.Cube.Define(stage, "/bigsat/geom")
-cube.CreateSizeAttr(1.0)
-stage.SetDefaultPrim(xform.GetPrim())
-stage.GetRootLayer().Save()
-
-# smallsat — 10x10x30 cm box
-stage2 = Usd.Stage.CreateNew(
-    "/home/sgq/SLI-5.1-cubesat_project/jazzy_ws/src/sli/urdf/smallsat/smallsat.usd"
-)
-xform2 = UsdGeom.Xform.Define(stage2, "/smallsat")
-cube2 = UsdGeom.Cube.Define(stage2, "/smallsat/geom")
-cube2.CreateSizeAttr(1.0)
-UsdGeom.Xformable(cube2).AddScaleOp().Set(Gf.Vec3f(0.1, 0.1, 0.3))
-stage2.SetDefaultPrim(xform2.GetPrim())
-stage2.GetRootLayer().Save()
-print("Done")
-```
-
-Then rebuild:
-```bash
-colcon build --packages-select sli
-``` -->
 
 ---
 
-## 3. Running
+## Running
+
+# MAY TAKE A FEW ATTEMPTS TO LAUNCH THE LAUNCH FILE, DUE TO CESIUM AND ISAAC SIM APIs BEING HARD TO WORK WITH
 
 ### Terminal 1 — Isaac Sim
 
 ```bash
-# Set isaac_sim path
-export isaac_sim_package_path=/isaac-sim
-export ROS_DISTRO=jazzy
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$isaac_sim_package_path/exts/isaacsim.ros2.bridge/jazzy/lib
+source /opt/ros/jazzy/setup.bash
+cd ~/SLI-5.1-cubesat_project/jazzy_ws
+source install/local_setup.bash
+export FASTRTPS_DEFAULT_PROFILES_FILE=~/SLI-5.1-cubesat_project/jazzy_ws/fastdds.xml
 
-# Source Python 3.11 build (for orbit_interfaces custom messages)
-source ~/SLI-5.1-cubesat_project/build_ws/jazzy/jazzy_ws/install/local_setup.bash
-source ~/SLI-5.1-cubesat_project/build_ws/jazzy/isaac_sim_ros_ws/install/local_setup.bash
-
-# Launch
-/isaac-sim/isaac-sim.sh \
-  --/isaac/startup/ros_bridge_extension=isaacsim.ros2.bridge \
-  --/isaac/startup/ros_sim_control_extension=True
+ros2 launch isaacsim run_isaacsim.launch.py \
+  install_path:=/isaac-sim \
+  ros_distro:=jazzy \
+  use_internal_libs:=true \
+  exclude_install_path:=/home/sgq/SLI-5.1-cubesat_project/jazzy_ws/install \
+  ros_installation_path:=/home/sgq/SLI-5.1-cubesat_project/build_ws/jazzy/jazzy_ws/install/local_setup.bash,/home/sgq/SLI-5.1-cubesat_project/build_ws/jazzy/isaac_sim_ros_ws/install/local_setup.bash \
+  custom_args:="--/isaac/startup/ros_sim_control_extension=True"
 ```
 
-Wait for Isaac Sim viewport to fully load before proceeding.
+Wait for: `Isaac Sim Full App is loaded.`
 
 ### Terminal 2 — ROS2 nodes
 
-Open a **fresh terminal** (not the same session as Terminal 1):
+Open a **fresh terminal**:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
+export FASTRTPS_DEFAULT_PROFILES_FILE=~/SLI-5.1-cubesat_project/jazzy_ws/fastdds.xml
 cd ~/SLI-5.1-cubesat_project/jazzy_ws
 source install/local_setup.bash
 ros2 launch sli orbit.launch.py
@@ -225,9 +168,9 @@ ros2 launch sli orbit.launch.py
 
 ### What happens at launch
 
-1. `scene_loader_node` waits for Isaac Sim services, calls `/load_world` with `earthmodel.usd`, calls `/spawn_entity` for each body with `spawn: true`, calls `/set_simulation_state → PLAYING`, then exits cleanly.
+1. `scene_loader_node` waits for Isaac Sim services, calls `/spawn_entity` for each body with `spawn: true`, calls `/set_simulation_state → PLAYING`, then exits.
 2. `orbit_vel_node` instances start integrating (RK4) and publish `OrbitState` at 30 Hz.
-3. `cw_node` instance subscribes to chief's `OrbitState`, integrates Hill's equations, publishes deputy `OrbitState`.
+3. `cw_node` subscribes to chief's `OrbitState`, integrates Hill's equations, publishes deputy `OrbitState`.
 4. `isaac_bridge_node` instances subscribe to orbit state and call `/set_entity_state` to move prims each frame.
 
 ---
@@ -235,10 +178,11 @@ ros2 launch sli orbit.launch.py
 ## Configuration — `orbit_scene.yaml`
 
 ```yaml
-workspace_root: ${ORBIT_WS}   # auto-resolved from install path
+workspace_root: ${ORBIT_WS}
 
 world:
   base_scene: usd_files/earth/earthmodel.usd
+  skip_load_world: true   # Isaac Sim opens USD directly; skip /load_world ROS service
 
 simulation:
   mu: 398600.4418    # km³/s²
@@ -258,9 +202,9 @@ bodies:
     attractor: /World/Earth
     orbit:
       type: circular
-      radius: 6778000   # m (Isaac Sim uses meters)
+      radius: 6778000
       plane: xy
-    scale: 1000.0       # km→m: orbit math in km, Isaac Sim in m
+    scale: 1.0       
 
   - name: sat2
     prim_path: /World/Sat2
@@ -270,13 +214,13 @@ bodies:
     attractor: /World/Earth
     orbit:
       type: elements
-      a: 6778000        # m
+      a: 6778000
       e: 0.01
       inc: 28.5
       raan: 0.0
       argp: 0.0
       nu: 45.0
-    scale: 1000.0
+    scale: 1.0
 
   - name: sat3
     prim_path: /World/Sat3
@@ -289,15 +233,8 @@ bodies:
       type: cw_relative
       dr: [1.0, 0.0, 0.5]    # initial relative pos LVLH frame (km)
       dv: [0.0, 0.001, 0.0]  # initial relative vel LVLH frame (km/s)
-    scale: 1000.0
+    scale: 1.0
 ```
-
-**Body roles:**
-- `attractor` — anchor only, not simulated
-- `orbit` — RK4 two-body integrator
-- `cw` — Clohessy-Wiltshire Hill's equations (proximity ops)
-
-**Scale note:** Orbit math runs in km throughout. `scale: 1000.0` converts km → m for Isaac Sim's `/set_entity_state`. The `radius`/`a` fields in the config are passed to Isaac Sim for display scaling only — the integrator uses the `mu` and orbital element values directly in km units.
 
 ---
 
@@ -311,14 +248,6 @@ ros2 topic pub --once /sat1/cmd_thrust orbit_interfaces/msg/ThrustCmd \
     throttle: 0.1, gimbal_pitch: 0.0, gimbal_yaw: 1.5708}"
 ```
 
-Stop thrust:
-
-```bash
-ros2 topic pub --once /sat1/cmd_thrust orbit_interfaces/msg/ThrustCmd \
-  "{header: {frame_id: 'world'}, body_id: '/World/Sat1', \
-    throttle: 0.0, gimbal_pitch: 0.0, gimbal_yaw: 0.0}"
-```
-
 Monitor orbit state:
 
 ```bash
@@ -328,34 +257,17 @@ ros2 topic hz /sat1/orbit_state    # should be ~30 Hz
 
 ---
 
-## Isaac Sim Services Reference
-
-Available once `isaacsim.ros2.sim_control` is enabled:
-
-| Service | Purpose |
-|---|---|
-| `/load_world` | Load a USD file as the scene |
-| `/spawn_entity` | Spawn a USD asset into the stage |
-| `/set_entity_state` | Set pose + twist of any prim |
-| `/get_entity_state` | Query pose + twist of any prim |
-| `/get_entities` | List all prims in stage |
-| `/set_simulation_state` | Play / Pause / Stop |
-| `/step_simulation` | Step N frames (requires paused) |
-| `/reset_simulation` | Remove spawned entities, reset |
-
----
-
 ## Known Issues & Limitations
 
-**Orbital motion appears slow** — orbit math is in km, Isaac Sim is in meters. `scale: 1000.0` converts positions correctly, but the visual motion speed depends on how the earthmodel.usd scene is scaled. At true LEO scale (6778 km radius) the orbital period is ~92 minutes.
+**`simulation_interfaces` version** — Isaac Sim 5.1 bundles its own internal build of `simulation_interfaces`. The system apt version (`ros-jazzy-simulation-interfaces`) must be used by external nodes. Do not build `simulation_interfaces` from source into `jazzy_ws`.
 
-**`simulation_interfaces` version mismatch** — Isaac Sim bundles version 1.1.0, apt installs 1.2.0. The `LD_LIBRARY_PATH` fix in Terminal 1 forces Isaac Sim to use its bundled version. Do not source system ROS2 in the same terminal as Isaac Sim.
+**FastDDS required** — both terminals must export `FASTRTPS_DEFAULT_PROFILES_FILE` pointing to `fastdds.xml` before launching. Without this, Isaac Sim's ROS2 services are not visible to external nodes.
 
-**Terminal isolation required** — Isaac Sim terminal must have `LD_LIBRARY_PATH` set to Isaac Sim's internal libs. ROS2 nodes terminal must be a fresh terminal without those vars. Mixing them causes either Isaac Sim crash or `ros2` CLI failure.
+**`use_internal_libs:=true` required** — the `run_isaacsim.launch.py` launcher must use `use_internal_libs:=true` and `exclude_install_path` pointing to the jazzy_ws install. This ensures Isaac Sim uses its own bundled ROS2 libraries.
 
-**Cesium crash without LD_LIBRARY_PATH fix** — if Isaac Sim is launched without the internal lib path set, it may crash on `/load_world` with a Cesium segfault. Always use the full Terminal 1 launch sequence above.
+**Cesium crash** — `earthmodel.usd` must not contain Cesium ion server relationship prims. The included USD is a clean sphere. To add Cesium terrain, do so through the Isaac Sim GUI after launch.
 
-**USD default prim** — satellite USDs must have a default prim set. The Script Editor generation step above handles this correctly. URDF-imported USDs do not set a default prim automatically.
+**Orbital scale** — orbit math runs in km. `scale: 1000.0` converts km → m for Isaac Sim. At true LEO scale (6778 km radius) the orbital period is ~92 minutes.
 
 ---
 
@@ -367,8 +279,6 @@ Available once `isaacsim.ros2.sim_control` is enabled:
 |---|---|---|
 | Docker build output | 3.11 | Isaac Sim internal ROS2 bridge, custom message `.so` files |
 | System ROS2 Jazzy | 3.12 | `orbit_vel_node`, `cw_node`, `isaac_bridge_node`, `scene_loader_node` |
-
-DDS handles transport between them — Python version mismatch only affects direct `.so` imports, not over-the-wire communication.
 
 ### Rebuilding after node changes
 
@@ -392,4 +302,4 @@ source install/local_setup.bash
 
 1. Add entry to `orbit_scene.yaml` with appropriate `role`, `usd`, `orbit` fields
 2. No code changes needed — launch file generates nodes dynamically from config
-3. Rebuild `sli` package if config was installed (or use `ORBIT_WS` pointing to source)
+3. Rebuild `sli` package
