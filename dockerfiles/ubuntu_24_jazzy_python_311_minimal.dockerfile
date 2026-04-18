@@ -203,7 +203,7 @@ COPY jazzy_ws/src /workspace/build_ws/src
 # Removing MoveIt packages from the internal ROS Python 3.11 library build as it uses standard interfaces already built above.
 # This is to ensure that the internal build is as minimal as possible. 
 # For the user facing MoveIt interface workflow, this package should be built with the rest of the workspace uisng the external ROS installation.
-RUN rm -rf /workspace/build_ws/src/moveit
+RUN rm -rf /workspace/build_ws/src/moveit /workspace/build_ws/src/sli_gnc
 
 # Make sure we're in the right directory
 WORKDIR /workspace
