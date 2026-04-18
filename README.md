@@ -91,7 +91,7 @@ SLI-5.1-cubesat_project/
 ## Prerequisites
 
 ### System
-- Ubuntu 24.04 (Zorin 18 confirmed working)
+- Ubuntu 24.04 (Zorin 18, Ubuntu based distros confirmed working)
 - NVIDIA GPU with driver ≥ 535
 - Docker (for building Python 3.11 custom message binaries)
 - NVIDIA Isaac Sim 5.1 (workstation install at `/isaac-sim`)
