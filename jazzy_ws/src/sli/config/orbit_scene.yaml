@@ -2,6 +2,7 @@ workspace_root: ${ORBIT_WS}
 
 world:
   base_scene: usd_files/earth/earthmodel.usd
+  skip_load_world: true # Isaac Sim opens USD directly; skip /load_world ROS
 
 simulation:
   mu: 398600.4418      # km³/s²

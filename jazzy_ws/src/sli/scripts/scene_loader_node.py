@@ -113,6 +113,9 @@ class SceneLoaderNode(Node):
             self.get_logger().info(f"{name} ready.")
 
     def _load_world(self):
+        if self._cfg.get("world", {}).get("skip_load_world", False):
+            self.get_logger().info("skip_load_world=true — skipping /load_world.")
+            return
         raw = self._cfg.get("world", {}).get("base_scene", "")
         if not raw:
             self.get_logger().warn("No base_scene — skipping /load_world.")

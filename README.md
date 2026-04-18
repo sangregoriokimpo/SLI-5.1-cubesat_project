@@ -142,14 +142,14 @@ source /opt/ros/jazzy/setup.bash
 cd ~/SLI-5.1-cubesat_project/jazzy_ws
 source install/local_setup.bash
 export FASTRTPS_DEFAULT_PROFILES_FILE=~/SLI-5.1-cubesat_project/jazzy_ws/fastdds.xml
-
 ros2 launch isaacsim run_isaacsim.launch.py \
   install_path:=/isaac-sim \
   ros_distro:=jazzy \
   use_internal_libs:=true \
-  exclude_install_path:=/home/sgq/SLI-5.1-cubesat_project/jazzy_ws/install \
-  ros_installation_path:=/home/sgq/SLI-5.1-cubesat_project/build_ws/jazzy/jazzy_ws/install/local_setup.bash,/home/sgq/SLI-5.1-cubesat_project/build_ws/jazzy/isaac_sim_ros_ws/install/local_setup.bash \
-  custom_args:="--/isaac/startup/ros_sim_control_extension=True"
+  exclude_install_path:=$(pwd)/install \
+  ros_installation_path:=$(pwd)/../build_ws/jazzy/jazzy_ws/install/local_setup.bash,$(pwd)/../build_ws/jazzy/isaac_sim_ros_ws/install/local_setup.bash \
+  custom_args:="--/isaac/startup/ros_sim_control_extension=True" \
+  gui:=$(ros2 pkg prefix sli)/share/sli/usd_files/earth/earthmodel.usd
 ```
 
 Wait for: `Isaac Sim Full App is loaded.`
