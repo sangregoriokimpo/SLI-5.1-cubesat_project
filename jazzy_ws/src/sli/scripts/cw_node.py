@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
+
 import math
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from orbit_interfaces.msg import OrbitState, ThrustCmd
 from std_msgs.msg import Bool
+
 
 
 def v_add(a, b): return (a[0]+b[0], a[1]+b[1], a[2]+b[2])
@@ -29,17 +32,20 @@ def v_normalize(a):
     return (a[0]/n, a[1]/n, a[2]/n)
 
 
-def lvlh_to_inertial_matrix(r_chief, v_chief):
+def lvlh_basis(r_chief, v_chief):
+    """
+    Returns (x_hat, y_hat, z_hat) column vectors of LVLH frame.
+    x = radial, y = along-track, z = orbit-normal
+    """
     x_hat = v_normalize(r_chief)
-    h = v_cross(r_chief, v_chief)
-    z_hat = v_normalize(h)
+    z_hat = v_normalize(v_cross(r_chief, v_chief))
     y_hat = v_cross(z_hat, x_hat)
     return x_hat, y_hat, z_hat
 
 
-def lvlh_to_inertial(dr_lvlh, r_chief, v_chief):
-    x_hat, y_hat, z_hat = lvlh_to_inertial_matrix(r_chief, v_chief)
-    dx, dy, dz = dr_lvlh
+def lvlh_to_inertial(vec_lvlh, r_chief, v_chief):
+    x_hat, y_hat, z_hat = lvlh_basis(r_chief, v_chief)
+    dx, dy, dz = vec_lvlh
     return (
         x_hat[0]*dx + y_hat[0]*dy + z_hat[0]*dz,
         x_hat[1]*dx + y_hat[1]*dy + z_hat[1]*dz,
@@ -47,55 +53,40 @@ def lvlh_to_inertial(dr_lvlh, r_chief, v_chief):
     )
 
 
-def inertial_to_lvlh(dr_inertial, r_chief, v_chief):
-    x_hat, y_hat, z_hat = lvlh_to_inertial_matrix(r_chief, v_chief)
-    dx = v_dot(dr_inertial, x_hat)
-    dy = v_dot(dr_inertial, y_hat)
-    dz = v_dot(dr_inertial, z_hat)
-    return (dx, dy, dz)
-
-
-def cw_rk4_step(n, rho, rho_dot, dt, a_cmd=(0.0, 0.0, 0.0)):
+def cw_rk4_step(n, rho, rho_dot, dt, a_lvlh=(0.0, 0.0, 0.0)):
+    """
+    One RK4 step of Hill's equations.
+    rho, rho_dot, a_lvlh all in LVLH frame.
+    n: chief mean motion (rad/s)
+    """
     def f(r, v):
-        x, y, z = r
+        x, y, z   = r
         xd, yd, zd = v
-        ax, ay, az = a_cmd
-        xdd = 2*n*yd + 3*n*n*x + ax
-        ydd = -2*n*xd         + ay
-        zdd = -n*n*z          + az
+        ax, ay, az = a_lvlh
+        xdd =  2*n*yd + 3*n*n*x + ax
+        ydd = -2*n*xd           + ay
+        zdd =   -n*n*z          + az
         return v, (xdd, ydd, zdd)
 
     def add(a, b): return v_add(a, b)
     def mul(s, a): return v_mul(s, a)
 
     k1r, k1v = f(rho, rho_dot)
-    r2 = add(rho,     mul(0.5*dt, k1r))
-    v2 = add(rho_dot, mul(0.5*dt, k1v))
+    r2 = add(rho,     mul(0.5*dt, k1r)); v2 = add(rho_dot, mul(0.5*dt, k1v))
     k2r, k2v = f(r2, v2)
-    r3 = add(rho,     mul(0.5*dt, k2r))
-    v3 = add(rho_dot, mul(0.5*dt, k2v))
+    r3 = add(rho,     mul(0.5*dt, k2r)); v3 = add(rho_dot, mul(0.5*dt, k2v))
     k3r, k3v = f(r3, v3)
-    r4 = add(rho,     mul(dt, k3r))
-    v4 = add(rho_dot, mul(dt, k3v))
+    r4 = add(rho,     mul(dt, k3r));     v4 = add(rho_dot, mul(dt, k3v))
     k4r, k4v = f(r4, v4)
 
     def comb(k1, k2, k3, k4):
         return mul(dt/6.0, add(add(k1, mul(2.0, k2)),
                                add(mul(2.0, k3), k4)))
 
-    rho_next     = add(rho,     comb(k1r, k2r, k3r, k4r))
-    rho_dot_next = add(rho_dot, comb(k1v, k2v, k3v, k4v))
-    return rho_next, rho_dot_next
+    return add(rho,     comb(k1r, k2r, k3r, k4r)), \
+           add(rho_dot, comb(k1v, k2v, k3v, k4v))
 
 
-def thrust_to_accel(throttle, pitch, yaw):
-    if throttle == 0.0:
-        return (0.0, 0.0, 0.0)
-    cp, sp = math.cos(pitch), math.sin(pitch)
-    cy, sy = math.cos(yaw),   math.sin(yaw)
-    return (throttle * cp * cy,
-            throttle * cp * sy,
-            throttle * sp)
 
 
 class CWNode(Node):
@@ -132,88 +123,79 @@ class CWNode(Node):
             self.get_parameter("dv_z").value,
         )
 
-        self._r_chief       = None
-        self._v_chief       = None
+        self._r_chief        = None
+        self._v_chief        = None
         self._chief_received = False
-        self._a_cmd         = (0.0, 0.0, 0.0)
-        self._paused        = False   # pause gate
+        self._f_lvlh         = (0.0, 0.0, 0.0)   
+        self._paused         = False
 
-        # Subscriptions
         self._chief_sub = self.create_subscription(
             OrbitState, self._chief_topic, self._on_chief_state, 10
         )
         self._thrust_sub = self.create_subscription(
             ThrustCmd, "cmd_thrust", self._on_thrust, 10
         )
-        # Global pause gate
+
+        pause_qos = QoSProfile(
+            depth=1,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
         self._pause_sub = self.create_subscription(
-            Bool, "/sim_pause", self._on_pause, 10
+            Bool, "/sim_pause", self._on_pause, pause_qos
         )
 
-        # Publisher
         self._pub = self.create_publisher(OrbitState, "orbit_state", 10)
 
-        # Timers
         self.create_timer(self._dt_sim,       self._integrate_step)
         self.create_timer(1.0 / publish_rate, self._publish_state)
 
         self.get_logger().info(
-            f"cw_node started: {self._prim_path} "
-            f"chief={self._chief_topic} "
-            f"dr={self._rho} dv={self._rho_dot}"
+            f"cw_node: {self._prim_path}  chief={self._chief_topic}  "
+            f"dr={self._rho}  dv={self._rho_dot}"
         )
-
-    # ------------------------------------------------------------------
 
     def _on_pause(self, msg: Bool):
         if msg.data != self._paused:
             self._paused = msg.data
-            state_str = "PAUSED" if self._paused else "RESUMED"
-            self.get_logger().info(f"[{self._prim_path}] {state_str}")
+            self.get_logger().info(
+                f"[{self._prim_path}] {'PAUSED' if self._paused else 'RESUMED'}"
+            )
 
     def _on_chief_state(self, msg: OrbitState):
-        # Always update chief state even when paused — keeps reference fresh
-        # for when we resume or do a chief swap
         self._r_chief = (msg.position.x, msg.position.y, msg.position.z)
         self._v_chief = (msg.velocity.x, msg.velocity.y, msg.velocity.z)
         self._chief_received = True
 
     def _on_thrust(self, msg: ThrustCmd):
-        self._a_cmd = thrust_to_accel(
-            msg.throttle, msg.gimbal_pitch, msg.gimbal_yaw
-        )
+        self._f_lvlh = (msg.fx, msg.fy, msg.fz)
         self.get_logger().info(
-            f"ThrustCmd LVLH: throttle={msg.throttle:.4f} "
-            f"→ a_cmd={self._a_cmd}"
+            f"ThrustCmd LVLH: fx={msg.fx:.4e} fy={msg.fy:.4e} fz={msg.fz:.4e}"
         )
 
     def _integrate_step(self):
         if self._paused or not self._chief_received:
             return
 
-        r_chief = self._r_chief
-        r_mag   = v_norm(r_chief)
+        r_mag = v_norm(self._r_chief)
         if r_mag < 1e-6:
             return
 
         n = math.sqrt(self._mu / r_mag**3)
 
         self._rho, self._rho_dot = cw_rk4_step(
-            n, self._rho, self._rho_dot, self._dt_sim, self._a_cmd
+            n, self._rho, self._rho_dot, self._dt_sim, self._f_lvlh
         )
 
     def _publish_state(self):
         if self._paused or not self._chief_received:
             return
 
-        r_chief = self._r_chief
-        v_chief = self._v_chief
+        dr_inertial = lvlh_to_inertial(self._rho,     self._r_chief, self._v_chief)
+        dv_inertial = lvlh_to_inertial(self._rho_dot, self._r_chief, self._v_chief)
 
-        dr_inertial = lvlh_to_inertial(self._rho,     r_chief, v_chief)
-        dv_inertial = lvlh_to_inertial(self._rho_dot, r_chief, v_chief)
-
-        r_body = v_add(r_chief, dr_inertial)
-        v_body = v_add(v_chief, dv_inertial)
+        r_body = v_add(self._r_chief, dr_inertial)
+        v_body = v_add(self._v_chief, dv_inertial)
 
         msg = OrbitState()
         msg.header.stamp    = self.get_clock().now().to_msg()
@@ -225,6 +207,10 @@ class CWNode(Node):
         msg.velocity.x      = v_body[0]
         msg.velocity.y      = v_body[1]
         msg.velocity.z      = v_body[2]
+        msg.attitude.w      = 1.0
+        msg.attitude.x      = 0.0
+        msg.attitude.y      = 0.0
+        msg.attitude.z      = 0.0
         self._pub.publish(msg)
 
 
