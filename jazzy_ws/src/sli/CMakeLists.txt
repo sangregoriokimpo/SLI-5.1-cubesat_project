@@ -44,4 +44,9 @@ install(PROGRAMS scripts/cw_node.py
   RENAME cw_node
 )
 
+install(PROGRAMS scripts/orbit_control_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME orbit_control_node
+)
+
 ament_package()
