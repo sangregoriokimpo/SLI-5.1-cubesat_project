@@ -1,15 +1,13 @@
 # SLI CubeSat Orbital Mechanics Simulation
 ## Isaac Sim 5.1 + ROS2 Jazzy
 
-# DOES NOT HAVE ITAR FILES YET
+> **ITAR NOTE: Does not contain ITAR files.**
 
-Sierra Lobo Inc, CubeSat orbital mechanics simulation using NVIDIA Isaac Sim 5.1 and ROS2 Jazzy. Physics runs as pure ROS2 nodes outside Isaac Sim. Isaac Sim is used as a renderer only, controlled via the `simulation_interfaces` standard.
+Sierra Lobo Inc CubeSat proximity operations simulation. Physics runs entirely outside Isaac Sim as standalone ROS2 nodes. Isaac Sim is renderer only, driven via the `simulation_interfaces` standard. This means the orbital math has no GPU dependency and can be tested independently.
 
 ![cubesats](image.png)
 
 ![rqt](rosgraphSLI0.png)
-
-
 
 ---
 
@@ -30,6 +28,9 @@ External ROS2 process (Python 3.12, system Jazzy)
 │                                                  │
 │  scene_loader_node  (runs once at startup)       │
 │    /spawn_entity → /play → exits                 │
+│                                                  │
+│  orbit_control_node  (optional supervisor)       │
+│    pause/resume, time stepping, warp factor      │
 └─────────────────────────────────────────────────┘
               │  ROS2 DDS (FastRTPS)
               ▼
@@ -41,7 +42,7 @@ Isaac Sim process (Python 3.11, internal Jazzy)
 └─────────────────────────────────────────────────┘
 ```
 
-Key principle: **physics has zero Isaac Sim dependency**. Nodes are pure Python and can be unit tested without a GPU.
+Physics has zero Isaac Sim dependency. All nodes are pure Python and can be unit tested without a GPU.
 
 ---
 
@@ -56,33 +57,36 @@ SLI-5.1-cubesat_project/
 │   ├── fastdds.xml                 # FastDDS UDP config (required)
 │   └── src/
 │       ├── isaacsim/               # NVIDIA Isaac Sim ROS2 launcher package
-│       ├── orbit_interfaces/       # Custom ROS2 messages
-│       │   └── msg/
-│       │       ├── OrbitState.msg
-│       │       └── ThrustCmd.msg
-│       └── sli/                    # Main simulation package
-│           ├── CMakeLists.txt
-│           ├── package.xml
-│           ├── config/
-│           │   └── orbit_scene.yaml
-│           ├── launch/
-│           │   └── orbit.launch.py
-│           ├── scripts/
-│           │   ├── scene_loader_node.py
-│           │   ├── orbit_vel_node.py
-│           │   ├── cw_node.py
-│           │   └── isaac_bridge_node.py
-│           ├── usd_files/
-│           │   └── earth/
-│           │       └── earthmodel.usd
-│           └── urdf/
-│               ├── bigsat/
-│               │   └── bigsat.usd
-│               └── smallsat/
-│                   └── smallsat.usd
+│       ├── orbit_interfaces/       # Custom ROS2 messages + services
+│       │   ├── msg/
+│       │   │   ├── OrbitState.msg
+│       │   │   └── ThrustCmd.msg
+│       │   └── srv/
+│       │       ├── SpawnBody.srv
+│       │       └── StepIntegration.srv
+│       ├── sli/                    # Main simulation package
+│       │   ├── config/
+│       │   │   └── orbit_scene.yaml
+│       │   ├── launch/
+│       │   │   └── orbit.launch.py
+│       │   ├── scripts/
+│       │   │   ├── scene_loader_node.py
+│       │   │   ├── orbit_vel_node.py
+│       │   │   ├── cw_node.py
+│       │   │   ├── isaac_bridge_node.py
+│       │   │   └── orbit_control_node.py
+│       │   ├── usd_files/
+│       │   │   └── earth/
+│       │   │       └── earthmodel.usd
+│       │   └── urdf/
+│       │       ├── bigsat/bigsat.usd
+│       │       └── smallsat/smallsat.usd
+│       └── sli_gnc/                # C++ GNC package (builds on host only)
+│           └── src/
+│               └── teleop_node.cpp
 └── build_ws/                       # Docker build output (Python 3.11 binaries)
     └── jazzy/
-        ├── jazzy_ws/install/       # Source before running Isaac Sim
+        ├── jazzy_ws/install/
         └── isaac_sim_ros_ws/install/
 ```
 
@@ -91,24 +95,24 @@ SLI-5.1-cubesat_project/
 ## Prerequisites
 
 ### System
-- Ubuntu 24.04 (Zorin 18, Ubuntu based distros confirmed working)
-- NVIDIA GPU with driver ≥ 535
+- Ubuntu 24.04 (Zorin 18 and other Ubuntu based distros confirmed working)
+- NVIDIA GPU, driver ≥ 535
 - Docker (for building Python 3.11 custom message binaries)
-- NVIDIA Isaac Sim 5.1 (workstation install at `/isaac-sim`)
-- ROS2 Jazzy (system apt install, Python 3.12)
+- NVIDIA Isaac Sim 5.1 installed at `/isaac-sim`
+- ROS2 Jazzy (system apt, Python 3.12)
 
 ### ROS2 packages
 ```bash
 sudo apt install ros-jazzy-simulation-interfaces
 ```
 
-> **Important:** `simulation_interfaces` must be the system apt version. Do **not** build it from source into `jazzy_ws` — Isaac Sim's internal `.so` files are compiled against the apt version and will crash with any other build.
+> `simulation_interfaces` must be the system apt version. Do not build it from source into `jazzy_ws` — Isaac Sim's internal `.so` files are compiled against the apt version and will crash otherwise.
 
 ---
 
 ## Setup
 
-### 1. Build custom messages (Docker, Python 3.11 — for Isaac Sim)
+### 1. Build custom messages (Docker — Python 3.11 for Isaac Sim)
 
 ```bash
 cd ~/SLI-5.1-cubesat_project
@@ -116,7 +120,7 @@ git submodule update --init --recursive
 sudo ./build_ros.sh -d jazzy -v 24.04
 ```
 
-Output at:
+Output lands at:
 - `build_ws/jazzy/jazzy_ws/install/` — Python 3.11 Jazzy base
 - `build_ws/jazzy/isaac_sim_ros_ws/install/` — Python 3.11 custom messages
 
@@ -133,7 +137,7 @@ source install/local_setup.bash
 
 ## Running
 
-# MAY TAKE A FEW ATTEMPTS TO LAUNCH THE LAUNCH FILE, DUE TO CESIUM AND ISAAC SIM APIs BEING HARD TO WORK WITH
+> Isaac Sim + Cesium can be temperamental at startup. If the launch fails, Ctrl-C and try again — it usually works within 2-3 attempts.
 
 ### Terminal 1 — Isaac Sim
 
@@ -156,7 +160,7 @@ Wait for: `Isaac Sim Full App is loaded.`
 
 ### Terminal 2 — ROS2 nodes
 
-Open a **fresh terminal**:
+Open a fresh terminal:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -166,12 +170,65 @@ source install/local_setup.bash
 ros2 launch sli orbit.launch.py
 ```
 
+### Terminal 3 — Orbit control supervisor (optional)
+
+```bash
+source /opt/ros/jazzy/setup.bash
+export FASTRTPS_DEFAULT_PROFILES_FILE=~/SLI-5.1-cubesat_project/jazzy_ws/fastdds.xml
+cd ~/SLI-5.1-cubesat_project/jazzy_ws
+source install/local_setup.bash
+ros2 run sli orbit_control_node
+```
+
+Run with time warp (see [Orbit Control](#orbit-control) below):
+```bash
+ros2 run sli orbit_control_node --ros-args -p warp_factor:=100.0
+```
+
 ### What happens at launch
 
-1. `scene_loader_node` waits for Isaac Sim services, calls `/spawn_entity` for each body with `spawn: true`, calls `/set_simulation_state → PLAYING`, then exits.
+1. `scene_loader_node` waits for Isaac Sim services, calls `/spawn_entity` for each body marked `spawn: true`, then calls `/set_simulation_state → PLAYING` and exits.
 2. `orbit_vel_node` instances start integrating (RK4) and publish `OrbitState` at 30 Hz.
-3. `cw_node` subscribes to chief's `OrbitState`, integrates Hill's equations, publishes deputy `OrbitState`.
-4. `isaac_bridge_node` instances subscribe to orbit state and call `/set_entity_state` to move prims each frame.
+3. `cw_node` subscribes to the chief's `OrbitState`, integrates Hill's equations, publishes the deputy's `OrbitState`.
+4. `isaac_bridge_node` instances subscribe to each body's orbit state and call `/set_entity_state` to move prims every frame.
+
+---
+
+## Orbit Control
+
+`orbit_control_node` is a supervisor that sits on top of the existing nodes. It does not run any physics itself — it just controls the simulation clock.
+
+### Pause / Resume
+
+```bash
+ros2 service call /orbit_control/pause std_srvs/srv/SetBool "{data: true}"
+ros2 service call /orbit_control/pause std_srvs/srv/SetBool "{data: false}"
+```
+
+Pause is atomic — it gates all physics nodes via `/sim_pause` and freezes the Isaac Sim renderer via `/set_simulation_state` simultaneously.
+
+### Time Stepping
+
+Step N integration ticks then auto-pause. The service returns immediately; stepping runs in the background.
+
+```bash
+# Step ~1 second of sim time
+ros2 service call /orbit_control/step orbit_interfaces/srv/StepIntegration \
+  "{steps: 120, dt_sim: 0.0}"
+
+# Cancel a running step
+ros2 service call /orbit_control/cancel std_srvs/srv/Trigger "{}"
+```
+
+### Warp Factor
+
+`warp_factor` compresses wall-clock time during a step. At `warp_factor: 1.0` (default), stepping 120 ticks takes 1 real second. At `warp_factor: 100.0` it takes 10ms.
+
+```bash
+ros2 run sli orbit_control_node --ros-args -p warp_factor:=100.0
+```
+
+Note: warp only affects how long the step window stays open. The physics nodes always integrate at their own timer rate — at high warp many orbits worth of integration will complete before the step closes.
 
 ---
 
@@ -182,11 +239,11 @@ workspace_root: ${ORBIT_WS}
 
 world:
   base_scene: usd_files/earth/earthmodel.usd
-  skip_load_world: true   # Isaac Sim opens USD directly; skip /load_world ROS service
+  skip_load_world: true
 
 simulation:
   mu: 398600.4418    # km³/s²
-  dt_sim: 0.00833   # ~1/120 s
+  dt_sim: 0.00833    # ~1/120 s
 
 bodies:
   - name: earth
@@ -204,7 +261,7 @@ bodies:
       type: circular
       radius: 6778000
       plane: xy
-    scale: 1.0       
+    scale: 1.0
 
   - name: sat2
     prim_path: /World/Sat2
@@ -224,23 +281,50 @@ bodies:
 
   - name: sat3
     prim_path: /World/Sat3
-    role: cw            # Clohessy-Wiltshire deputy
+    role: cw
     spawn: true
     usd: urdf/smallsat/smallsat.usd
     attractor: /World/Earth
     chief: /World/Sat1
     orbit:
       type: cw_relative
-      dr: [1.0, 0.0, 0.5]    # initial relative pos LVLH frame (km)
-      dv: [0.0, 0.001, 0.0]  # initial relative vel LVLH frame (km/s)
+      dr: [1.0, 0.0, 0.5]    # initial relative pos, LVLH frame
+      dv: [0.0, 0.001, 0.0]  # initial relative vel, LVLH frame
     scale: 1.0
 ```
 
 ---
 
-## Sending Thrust Commands
+## Teleoperation (WIP — not fully working)
 
-Apply a prograde impulse to sat1:
+A keyboard teleop node exists in `sli_gnc` but is not yet working correctly. Build it on the host with system Jazzy (not Docker):
+
+```bash
+cd ~/SLI-5.1-cubesat_project/jazzy_ws
+colcon build --packages-select sli_gnc
+source install/local_setup.bash
+ros2 run sli_gnc teleop_node --ros-args -p target:=sat1
+```
+
+Intended key bindings:
+
+| Key | Action |
+|-----|--------|
+| `i` / `k` | +/- along-track |
+| `j` / `l` | -/+ radial |
+| `u` / `o` | +/- cross-track |
+| `Space` | zero thrust |
+| `F` | toggle LVLH / inertial frame |
+| `P` | pause / resume |
+| `Q` | quit |
+
+> Thrust commands, frame toggling, and pause work. Full teleoperation behavior is still being debugged.
+
+---
+
+## Thrust Commands (manual)
+
+Apply a prograde impulse to sat1 directly via topic:
 
 ```bash
 ros2 topic pub --once /sat1/cmd_thrust orbit_interfaces/msg/ThrustCmd \
@@ -257,17 +341,17 @@ ros2 topic hz /sat1/orbit_state    # should be ~30 Hz
 
 ---
 
-## Known Issues & Limitations
+## Known Issues
 
-**`simulation_interfaces` version** — Isaac Sim 5.1 bundles its own internal build of `simulation_interfaces`. The system apt version (`ros-jazzy-simulation-interfaces`) must be used by external nodes. Do not build `simulation_interfaces` from source into `jazzy_ws`.
+**`simulation_interfaces` version** — the system apt version must be used. Do not build it from source into `jazzy_ws`.
 
-**FastDDS required** — both terminals must export `FASTRTPS_DEFAULT_PROFILES_FILE` pointing to `fastdds.xml` before launching. Without this, Isaac Sim's ROS2 services are not visible to external nodes.
+**FastDDS required** — every terminal must export `FASTRTPS_DEFAULT_PROFILES_FILE` before launch. Without it, Isaac Sim's ROS2 services are invisible to external nodes.
 
-**`use_internal_libs:=true` required** — the `run_isaacsim.launch.py` launcher must use `use_internal_libs:=true` and `exclude_install_path` pointing to the jazzy_ws install. This ensures Isaac Sim uses its own bundled ROS2 libraries.
+**`use_internal_libs:=true` required** — ensures Isaac Sim uses its own bundled ROS2 libraries rather than the system ones, preventing Python 3.11/3.12 `.so` version mismatches.
 
-**Cesium crash** — `earthmodel.usd` must not contain Cesium ion server relationship prims. The included USD is a clean sphere. To add Cesium terrain, do so through the Isaac Sim GUI after launch.
+**Cesium crash** — `earthmodel.usd` must not contain Cesium ion server relationship prims. The included USD is a clean sphere. Add Cesium terrain through the Isaac Sim GUI after launch if needed.
 
-**Orbital scale** — orbit math runs in km. `scale: 1000.0` converts km → m for Isaac Sim. At true LEO scale (6778 km radius) the orbital period is ~92 minutes.
+**Orbital scale** — current parameters use `mu = 398600.4418 km³/s²` with `radius = 6778000` (mismatched units). This is intentional for visualization — satellites move slowly enough for Isaac Sim's camera to track. Physically correct parameters (`radius: 6778` km) would give a ~92-minute orbital period but satellites move too fast for the default camera.
 
 ---
 
@@ -278,9 +362,11 @@ ros2 topic hz /sat1/orbit_state    # should be ~30 Hz
 | Environment | Python | Used for |
 |---|---|---|
 | Docker build output | 3.11 | Isaac Sim internal ROS2 bridge, custom message `.so` files |
-| System ROS2 Jazzy | 3.12 | `orbit_vel_node`, `cw_node`, `isaac_bridge_node`, `scene_loader_node` |
+| System ROS2 Jazzy | 3.12 | All simulation nodes |
 
-### Rebuilding after node changes
+`sli_gnc` (C++) builds on the host with system Jazzy and is excluded from the Docker build.
+
+### Rebuild after node changes
 
 ```bash
 cd ~/SLI-5.1-cubesat_project/jazzy_ws
@@ -288,7 +374,7 @@ colcon build --packages-select sli
 source install/local_setup.bash
 ```
 
-### Rebuilding after message changes (requires Docker)
+### Rebuild after message changes (requires Docker)
 
 ```bash
 cd ~/SLI-5.1-cubesat_project
@@ -300,6 +386,6 @@ source install/local_setup.bash
 
 ### Adding a new body
 
-1. Add entry to `orbit_scene.yaml` with appropriate `role`, `usd`, `orbit` fields
-2. No code changes needed — launch file generates nodes dynamically from config
-3. Rebuild `sli` package
+1. Add an entry to `orbit_scene.yaml` with the appropriate `role`, `usd`, and `orbit` fields
+2. No code changes needed — `orbit.launch.py` generates nodes dynamically from config
+3. Rebuild `sli`
