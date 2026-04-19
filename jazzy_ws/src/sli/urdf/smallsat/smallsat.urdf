@@ -29,4 +29,43 @@
                                             izz="0.00333"/>
     </inertial>
   </link>
+
+  <link name="lidar_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.005"/>
+      </geometry>
+      <material name="lidar_black">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <link name="ir_camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.015 0.005 0.015"/>
+      </geometry>
+      <material name="ir_dark">
+        <color rgba="0.2 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Lidar on +Y face, boresight = +Z rotated to +Y -->
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="-0.02 0.05 0" rpy="-1.5708 0 0"/>
+  </joint>
+
+  <!-- IR camera on +Y face, same orientation -->
+  <joint name="ir_camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="ir_camera_link"/>
+    <origin xyz="0.02 0.05 0" rpy="-1.5708 0 0"/>
+  </joint>
+
 </robot>

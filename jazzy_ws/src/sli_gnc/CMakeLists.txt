@@ -25,4 +25,22 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+add_executable(teleop_node src/teleop_node.cpp)
+ament_target_dependencies(teleop_node
+  rclcpp
+  orbit_interfaces
+  std_msgs
+  simulation_interfaces
+)
+install(TARGETS teleop_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
 ament_package()

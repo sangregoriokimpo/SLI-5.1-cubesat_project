@@ -1,47 +1,50 @@
 #!/usr/bin/env python3
-"""
-orbit_vel_node.py — RK4 orbital integrator, one instance per body.
 
-OrbitState fields: header, body_id, position (Vector3), velocity (Vector3), attitude (Quaternion)
-ThrustCmd fields:  header, body_id, throttle (float64), gimbal_pitch (float64), gimbal_yaw (float64)
-
-Thrust model:
-  throttle    → acceleration magnitude km/s²
-  gimbal_pitch / gimbal_yaw → spherical angles (rad) in inertial frame
-    pitch=0, yaw=0   → +X
-    pitch=0, yaw=π/2 → +Y  (prograde for xy-plane circular orbit)
-    pitch=π/2        → +Z
-
-Parameters:
-  mu            float   gravitational parameter km³/s²
-  dt_sim        float   integrator timestep s
-  prim_path     string  USD prim path, used as body_id
-  attractor     string  attractor prim path
-  orbit_type    string  circular | elements
-  radius        float   (circular) km
-  plane         string  (circular) xy | xz | yz
-  a             float   (elements) semi-major axis km
-  e             float   (elements) eccentricity
-  inc           float   (elements) inclination deg
-  raan          float   (elements) RAAN deg
-  argp          float   (elements) argument of periapsis deg
-  nu            float   (elements) true anomaly deg
-  publish_rate  float   Hz, default 30.0
-"""
 
 import math
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from orbit_interfaces.msg import OrbitState, ThrustCmd
+from std_msgs.msg import Bool
 
 
-# ---------------------------------------------------------------------------
-# Orbital math
-# ---------------------------------------------------------------------------
+
 
 def v_add(a, b): return (a[0]+b[0], a[1]+b[1], a[2]+b[2])
 def v_mul(s, a): return (s*a[0], s*a[1], s*a[2])
 def v_norm(a):   return math.sqrt(a[0]**2 + a[1]**2 + a[2]**2)
+
+
+def v_cross(a, b):
+    return (
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0],
+    )
+
+
+def v_normalize(a):
+    n = v_norm(a)
+    if n < 1e-12:
+        return (0.0, 0.0, 0.0)
+    return (a[0]/n, a[1]/n, a[2]/n)
+
+
+def lvlh_to_inertial(f_lvlh, r, v):
+    """
+    Rotate vector from LVLH to inertial.
+    x = radial (r/|r|), z = orbit-normal (r×v/|r×v|), y = z×x (along-track)
+    """
+    x_hat = v_normalize(r)
+    z_hat = v_normalize(v_cross(r, v))
+    y_hat = v_cross(z_hat, x_hat)
+    fx, fy, fz = f_lvlh
+    return (
+        x_hat[0]*fx + y_hat[0]*fy + z_hat[0]*fz,
+        x_hat[1]*fx + y_hat[1]*fy + z_hat[1]*fz,
+        x_hat[2]*fx + y_hat[2]*fy + z_hat[2]*fz,
+    )
 
 
 def rot_z(angle, v):
@@ -77,7 +80,7 @@ def elements_ic(mu, a, e, inc_deg, raan_deg, argp_deg, nu_deg):
     return world(r_pqw), world(v_pqw)
 
 
-def rk4_step(mu, r, v, dt, a_cmd):
+def rk4_step(mu, r, v, dt, a_inertial):
     def gravity(rr):
         d = v_norm(rr)
         if d < 1e-12: return (0.0, 0.0, 0.0)
@@ -86,7 +89,7 @@ def rk4_step(mu, r, v, dt, a_cmd):
 
     def accel(rr):
         g = gravity(rr)
-        return (g[0]+a_cmd[0], g[1]+a_cmd[1], g[2]+a_cmd[2])
+        return (g[0]+a_inertial[0], g[1]+a_inertial[1], g[2]+a_inertial[2])
 
     k1r, k1v = v, accel(r)
     r2 = v_add(r, v_mul(0.5*dt, k1r)); v2 = v_add(v, v_mul(0.5*dt, k1v))
@@ -103,19 +106,6 @@ def rk4_step(mu, r, v, dt, a_cmd):
            v_add(v, comb(k1v, k2v, k3v, k4v))
 
 
-def thrust_to_accel(throttle, pitch, yaw):
-    if throttle == 0.0:
-        return (0.0, 0.0, 0.0)
-    cp, sp = math.cos(pitch), math.sin(pitch)
-    cy, sy = math.cos(yaw),   math.sin(yaw)
-    return (throttle * cp * cy,
-            throttle * cp * sy,
-            throttle * sp)
-
-
-# ---------------------------------------------------------------------------
-# Node
-# ---------------------------------------------------------------------------
 
 class OrbitVelNode(Node):
 
@@ -162,26 +152,60 @@ class OrbitVelNode(Node):
         else:
             raise ValueError(f"Unknown orbit_type: {orbit_type}")
 
-        self._a_cmd = (0.0, 0.0, 0.0)
+        self._f_lvlh = (0.0, 0.0, 0.0)   
+        self._paused  = False
 
         self._pub = self.create_publisher(OrbitState, "orbit_state", 10)
-        self._sub = self.create_subscription(
+
+        self._sub_thrust = self.create_subscription(
             ThrustCmd, "cmd_thrust", self._on_thrust, 10
         )
+
+        pause_qos = QoSProfile(
+            depth=1,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self._sub_pause = self.create_subscription(
+            Bool, "/sim_pause", self._on_pause, pause_qos
+        )
+
         self.create_timer(self._dt_sim,       self._integrate_step)
         self.create_timer(1.0 / publish_rate, self._publish_state)
 
         self.get_logger().info(
-            f"orbit_vel_node started: {self._prim_path} "
-            f"orbit_type={orbit_type} mu={self._mu} dt_sim={self._dt_sim}"
+            f"orbit_vel_node: {self._prim_path}  "
+            f"type={orbit_type}  mu={self._mu}  dt={self._dt_sim}"
+        )
+
+    def _on_pause(self, msg: Bool):
+        if msg.data != self._paused:
+            self._paused = msg.data
+            self.get_logger().info(
+                f"[{self._prim_path}] {'PAUSED' if self._paused else 'RESUMED'}"
+            )
+
+    def _on_thrust(self, msg: ThrustCmd):
+        self._f_lvlh = (msg.fx, msg.fy, msg.fz)
+        self.get_logger().info(
+            f"ThrustCmd LVLH: fx={msg.fx:.4e} fy={msg.fy:.4e} fz={msg.fz:.4e}"
         )
 
     def _integrate_step(self):
+        if self._paused:
+            return
+        if self._f_lvlh != (0.0, 0.0, 0.0):
+            a_inertial = lvlh_to_inertial(self._f_lvlh, self._r, self._v)
+        else:
+            a_inertial = (0.0, 0.0, 0.0)
+
         self._r, self._v = rk4_step(
-            self._mu, self._r, self._v, self._dt_sim, self._a_cmd
+            self._mu, self._r, self._v, self._dt_sim, a_inertial
         )
 
     def _publish_state(self):
+        if self._paused:
+            return
         msg = OrbitState()
         msg.header.stamp    = self.get_clock().now().to_msg()
         msg.header.frame_id = "world"
@@ -197,16 +221,6 @@ class OrbitVelNode(Node):
         msg.attitude.y      = 0.0
         msg.attitude.z      = 0.0
         self._pub.publish(msg)
-
-    def _on_thrust(self, msg: ThrustCmd):
-        self._a_cmd = thrust_to_accel(
-            msg.throttle, msg.gimbal_pitch, msg.gimbal_yaw
-        )
-        self.get_logger().info(
-            f"ThrustCmd: throttle={msg.throttle:.4f} "
-            f"pitch={msg.gimbal_pitch:.3f} yaw={msg.gimbal_yaw:.3f} "
-            f"→ a_cmd={self._a_cmd}"
-        )
 
 
 def main(args=None):
