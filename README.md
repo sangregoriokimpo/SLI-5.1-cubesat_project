@@ -94,12 +94,55 @@ SLI-5.1-cubesat_project/
 
 ## Prerequisites
 
+### Cesium for Omniverse (NEEDED FOR TERRAIN STREAMING)
+
+Cesium for Omniverse adds a full-scale WGS84 globe and streaming 3D terrain
+into Isaac Sim via Cesium ion. It is used in this project for Earth terrain
+visualization. The extension is free and open source, but terrain streaming
+requires a Cesium ion account (free tier available).
+
+**1. Create a Cesium ion account**
+
+Sign up at https://cesium.com/ion/signup if you don't have one. The free tier
+includes Cesium World Terrain and Bing Maps Aerial imagery.
+
+**2. Install Cesium for Omniverse**
+
+Cesium for Omniverse ships bundled with Isaac Sim 5.1, no separate download
+needed. Enable it from inside Isaac Sim:
+
+- Open Isaac Sim
+- Go to Window > Extensions
+- Search for `cesium.omniverse`
+- Toggle it on
+
+It loads automatically when `earthmodel.usd` is opened since the USD references
+it.
+
+**3. Connect to Cesium ion**
+
+Once enabled, the Cesium panel appears in the Isaac Sim sidebar. Click
+"Connect to Cesium ion" and sign in. This generates an access token saved to
+your local Omniverse config.
+
+> The `earthmodel.usd` included in this repo is a clean sphere with no Cesium
+> prims. This is intentional -- Cesium ion server relationship prims baked into
+> a USD file cause crashes on load. To add terrain, open the stage after launch
+> and add a Cesium tileset through the GUI.
+
+**Troubleshooting**
+
+The `pip install lxml` errors that appear in the Isaac Sim log at startup are
+normal and harmless. If terrain does not appear, check that your ion token is
+valid at https://cesium.com/ion/tokens.
+
 ### System
 - Ubuntu 24.04 (Zorin 18 and other Ubuntu based distros confirmed working)
 - NVIDIA GPU, driver >= 535
 - Docker (for building Python 3.11 custom message binaries)
 - NVIDIA Isaac Sim 5.1 installed at `/isaac-sim`
 - ROS2 Jazzy (system apt, Python 3.12)
+- Cesium installed on Isaac Sim
 
 ### ROS2 packages
 ```bash
