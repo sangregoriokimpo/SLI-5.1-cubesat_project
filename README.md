@@ -316,7 +316,7 @@ ThrustCmd fields:
 
 ## Orbit Control
 
-`orbit_control_node` is a supervisor that sits on top of the existing nodes. It does not run any physics -- it just controls the simulation clock.
+`orbit_control_node` is a supervisor that sits on top of the existing nodes. It does not run any physics, it just controls the simulation clock.
 
 ### Pause / Resume
 
@@ -325,7 +325,7 @@ ros2 service call /orbit_control/pause std_srvs/srv/SetBool "{data: true}"
 ros2 service call /orbit_control/pause std_srvs/srv/SetBool "{data: false}"
 ```
 
-Pause is atomic -- it gates all physics nodes via `/sim_pause` and freezes the Isaac Sim renderer via `/set_simulation_state` simultaneously.
+Pause is atomic, it gates all physics nodes via `/sim_pause` and freezes the Isaac Sim renderer via `/set_simulation_state` simultaneously.
 
 ### Time Stepping
 
@@ -348,7 +348,7 @@ ros2 service call /orbit_control/cancel std_srvs/srv/Trigger "{}"
 ros2 run sli orbit_control_node --ros-args -p warp_factor:=100.0
 ```
 
-Note: warp only affects how long the step window stays open. The physics nodes always integrate at their own timer rate -- at high warp many orbits worth of integration will complete before the step closes.
+Note: warp only affects how long the step window stays open. The physics nodes always integrate at their own timer rate, at high warp many orbits worth of integration will complete before the step closes.
 
 ---
 
@@ -463,5 +463,5 @@ source install/local_setup.bash
 ### Adding a new body
 
 1. Add an entry to `orbit_scene.yaml` with the appropriate `role`, `usd`, and `orbit` fields
-2. No code changes needed -- `orbit.launch.py` generates nodes dynamically from config
+2. No code changes needed, `orbit.launch.py` generates nodes dynamically from config
 3. Rebuild `sli`
