@@ -6,7 +6,9 @@ world:
 
 simulation:
   mu: 398600.4418      # km³/s²
-  dt_sim: 0.00833      # ~1/120 s
+  dt_sim: 0.05
+  publish_rate: 30
+  #dt_sim: 0.00833      # ~1/120 s
 
 bodies:
 
@@ -47,7 +49,7 @@ bodies:
     prim_path: /World/Sat3
     role: cw
     spawn: true
-    usd: urdf/smallsat/smallsat.usd
+    usd: urdf/smallsat/sensorsat/smallsat_clean.usd
     attractor: /World/Earth
     chief: /World/Sat1
     orbit:
