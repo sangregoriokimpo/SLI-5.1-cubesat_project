@@ -48,6 +48,9 @@ bodies:
   - name: sat3
     prim_path: /World/Sat3
     role: cw
+    sensors:
+      lidar: true
+      ir_camera: false
     spawn: true
     usd: urdf/smallsat/sensorsat/smallsat_clean.usd
     attractor: /World/Earth
