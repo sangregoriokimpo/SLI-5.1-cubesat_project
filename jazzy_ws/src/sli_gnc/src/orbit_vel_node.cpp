@@ -277,7 +277,7 @@ class OrbitVelNode : public rclcpp::Node{
             a_inertial = lvlh_to_inertial(f_lvlh_,r_,v_);
         }
 
-        auto [rn,vn] = rk4_step(mu_, r_, dt_sim_, a_inertial);
+        auto [rn,vn] = rk4_step(mu_, r_,v_, dt_sim_, a_inertial);
         r_ = rn;
         v_ = vn;
         if(omega_[0] || omega_[1] || omega_[2]){
@@ -289,7 +289,7 @@ class OrbitVelNode : public rclcpp::Node{
         if(paused_){
             return;
         }
-        auto msg = orbit_interfaces::msg::OrbitState():
+        auto msg = orbit_interfaces::msg::OrbitState();
         msg.header.stamp = now();
         msg.header.frame_id ="world";
         msg.body_id = prim_path_;
@@ -309,7 +309,7 @@ class OrbitVelNode : public rclcpp::Node{
 
 int main(int argc, char*argv[]){
     rclcpp::init(argc,argv);
-    rclcpp::spin(std::make_shared<OrbitVelNode());
+    rclcpp::spin(std::make_shared<OrbitVelNode>());
     rclcpp::shutdown();
     return 0;
 }
