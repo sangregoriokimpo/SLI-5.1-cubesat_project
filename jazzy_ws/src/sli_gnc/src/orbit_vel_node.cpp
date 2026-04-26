@@ -263,10 +263,41 @@ class OrbitVelNode : public rclcpp::Node{
 
 
     void integrate_step(){
+        if(paused_){
+            return;
+        }
+        V3 a_inertial = {0,0,0};
+        if (f_lvlh_[0] || f_lvlh_[1] || f_lvlh_[2]){
+            a_inertial = lvlh_to_inertial(f_lvlh_,r_,v_);
+        }
 
+        auto [rn,vn] = rk4_step(mu_, r_, dt_sim_, a_inertial);
+        r_ = rn;
+        v_ = vn;
+        if(omega_[0] || omega_[1] || omega_[2]){
+            q_ = q_integrate(q_,omega_,dt_sim_);
+        }
     }
 
     void publish_state(){
-
+        if(paused_){
+            return;
+        }
+        auto msg = orbit_interfaces::msg::OrbitState():
+        msg.header.stamp = now();
+        msg.header.frame_id ="world";
+        msg.body_id = prim_path_;
+        msg.position.x = r_[0];
+        msg.position.y = r_[1];
+        msg.position.z= r_[2];
+        msg.velocity.x = v_[0];
+        msg.velocity.y = v_[1];
+        msg.velocity.z = v_[2];
+        msg.attitude.w = q_[0];
+        msg.attitude.x = q_[1];
+        msg.attitude.y = q_[2];
+        msg.attitude.z= q_[3];
+        pub_->publish(msg);
     }
 };
+
