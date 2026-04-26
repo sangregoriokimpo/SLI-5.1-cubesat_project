@@ -185,6 +185,12 @@ static Q4 q_integrate(Q4 q, V3 omega, double dt){
         });  
 }
 
+/*
+
+ROS2 NODE 
+
+*/
+
 class OrbitVelNode : public rclcpp::Node{
     public: 
     OrbitVelNode(): Node("orbit_vel_node"){
@@ -301,3 +307,9 @@ class OrbitVelNode : public rclcpp::Node{
     }
 };
 
+int main(int argc, char*argv[]){
+    rclcpp::init(argc,argv);
+    rclcpp::spin(std::make_shared<OrbitVelNode());
+    rclcpp::shutdown();
+    return 0;
+}
