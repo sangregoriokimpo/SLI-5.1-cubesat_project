@@ -184,3 +184,89 @@ static Q4 q_integrate(Q4 q, V3 omega, double dt){
             q[3] + 0.5*qd[3]*dt
         });  
 }
+
+class OrbitVelNode : public rclcpp::Node{
+    public: 
+    OrbitVelNode(): Node("orbit_vel_node"){
+        declare_parameter("mu",398600.4418);
+        declare_parameter("dt_sim",0.05);
+        declare_parameter("publish_rate",30.0);
+        declare_parameter("prim_path","/world/Sat");
+        declare_parameter("orbit_type","circular");
+        declare_parameter("radius",6778000 );
+        declare_parameter("plane","xy");
+        declare_parameter("a",6778000 );
+        declare_parameter("e",0.0);
+        declare_parameter("inc",0.0);
+        declare_parameter("raan",0.0);
+        declare_parameter("argp",0.0);
+        declare_parameter("nu",0.0);
+        
+        mu_ = get_parameter("mu").as_double();
+        dt_sim_ = get_parameter("dt_sim").as_double();
+        prim_path_ = get_parameter("prim_path").as_string();
+        auto orbit_type = get_parameter("orbit_type").as_string();
+        auto publish_rate = get_parameter("publish_rate").as_double();
+
+        if(orbit_type =="circular"){
+            auto [r,v] = circular_ic(mu_, get_parameter("radius").as_double(), get_parameter("plane").as_string());
+            r_ = r;
+            v_ = v;
+        }else if (orbit_type == "elements"){
+            auto [r,v] = elements_ic(mu_,get_parameter("a").as_double(),get_parameter("e").as_double(),get_parameter("inc").as_double(),get_parameter("raan").as_double(),get_parameter("argp").as_double(),get_parameter("nu").as_double());
+            r_ = r;
+            v_ = v;
+        }else{
+            throw std::invalid_argument("Unknown orbit_type: " + orbit_type);
+        }
+
+        pub_ = create_publisher<orbit_interfaces::msg::OrbitState>("orbit_state",10);
+        sub_thrust_ = create_subscription<orbit_interfaces::msg::ThrustCmd>("cmd_thrust",10, [this](orbit_interfaces::msg::ThrustCmd::SharedPtr msg){
+            f_lvlh_ = {msg->fx, msg->fy, msg->fz};
+            omega_ = {msg->wx, msg-> wy, msg->wz};
+        }
+        );
+        rclcpp::QoS latch(1);
+        latch.transient_local().reliable();
+        sub_pause_ = create_subscription<std_msgs::msg::Bool>("/sim_pause",latch,[this](std_msgs::msg::Bool::SharedPtr msg){
+            if(msg->data != paused_){
+                paused_ = msg->data;
+                RCLCPP_INFO(get_logger(),"[%s] %s",prim_path_.c_str(), paused_ ? "PAUSED" : "RESUMED");
+            }
+        });
+        auto dt_ms = std::chrono::duration<double>(dt_sim_);
+        auto pub_ms = std::chrono::duration<double>(1.0 / publish_rate);
+
+        integrate_timer_ = create_wall_timer(dt_ms, [this](){integrate_step();});
+        publish_timer_ = create_wall_timer(pub_ms,[this](){publish_state();});
+
+        RCLCPP_INFO(get_logger(), "orbit_vel_node: %s dt=%.5fs pub=%.1fHz",prim_path_.c_str(), dt_sim_, publish_rate);
+
+    }
+    private:
+    double mu_;
+    double dt_sim_;
+    std::string prim_path_;
+    bool paused_ = false;
+    V3 r_ ={0,0,0};
+    V3 v_={0,0,0};
+    Q4 q_ ={1,0,0,0};
+    V3 f_lvlh_ ={0,0,0};
+    V3 omega_ = {0,0,0};
+
+    rclcpp::Publisher<orbit_interfaces::msg::OrbitState>::SharedPtr pub_;
+    rclcpp::Subscription<orbit_interfaces::msg::ThrustCmd>::SharedPtr sub_thrust_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_pause_;
+    rclcpp::TimerBase::SharedPtr integrate_timer_;
+    rclcpp::TimerBase::SharedPtr publish_timer_;
+
+
+
+    void integrate_step(){
+
+    }
+
+    void publish_state(){
+
+    }
+};
