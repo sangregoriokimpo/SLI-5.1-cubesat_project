@@ -16,6 +16,7 @@ using Q4 = std::array<double,4>;
 VECTOR MATH CODE
 
 */
+
 static V3 v_add(V3 a, V3 b){
     return {a[0]+b[0], a[1]+b[1], a[2]+b[2]};
 }
@@ -149,4 +150,37 @@ static std::pair<V3,V3>rk4_step(double mu, V3 r, V3 v, double dt, V3 a_ext){
 
 }
 
+/*
 
+QUARTERNION FUNCTIONS
+
+*/
+
+
+static Q4 q_mul(Q4 p, Q4 q){
+    return{
+        p[0]*q[0] - p[1]*q[1] - p[2]*q[2] - p[3]*q[3],
+        p[0]*q[1] + p[1]*q[0] + p[2]*q[3] - p[3]*q[2],
+        p[0]*q[2] - p[1]*q[3] + p[2]*q[0] + p[3]*q[1],
+        p[0]*q[3] + p[1]*q[2] - p[2]*q[1] + p[3]*q[0]
+    };
+}
+
+static Q4 q_normalize(Q4 q){
+    double n = std::sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
+    if(n < 1e-12){
+        return {1,0,0,0};
+    }
+    return {q[0]/n , q[1]/n, q[2]/n , q[3]/n};
+}
+
+static Q4 q_integrate(Q4 q, V3 omega, double dt){
+    Q4 om = {0.0, omega[0], omega[1], omega[2]};
+    Q4 qd = q_mul(q, om);
+    return q_normalize({
+            q[0] + 0.5*qd[0]*dt,
+            q[1] + 0.5*qd[1]*dt,
+            q[2] + 0.5*qd[2]*dt,
+            q[3] + 0.5*qd[3]*dt
+        });  
+}
