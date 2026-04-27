@@ -10,6 +10,12 @@
 using V3 = Eigen::Vector3d;
 using Q4 = Eigen::Quaterniond;
 
+/*
+
+CW INTEGRATION
+
+*/
+
 static std::pair<V3,V3> cw_rk4_step(double n, V3 rho, V3 rho_dot,double dt, V3 a){
     auto f = [&](V3 r, V3 v) -> std::pair<V3,V3>{
         V3 acc;
