@@ -1,0 +1,6 @@
+<launch>
+  <arg name="scene" default="orbit_scene.yaml"/>
+  <include file="$(find-pkg-share sli)/launch/orbit.launch.py">
+    <arg name="scene" value="$(var scene)"/>
+  </include>
+</launch>

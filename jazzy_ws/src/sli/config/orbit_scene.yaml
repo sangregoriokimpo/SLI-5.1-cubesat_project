@@ -2,11 +2,12 @@ workspace_root: ${ORBIT_WS}
 
 world:
   base_scene: usd_files/earth/earthmodel.usd
-  skip_load_world: true # Isaac Sim opens USD directly; skip /load_world ROS
+  skip_load_world: true
 
 simulation:
-  mu: 398600.4418      # km³/s²
-  dt_sim: 0.00833      # ~1/120 s
+  mu: 398600.4418
+  dt_sim: 0.005
+  publish_rate: 30.0
 
 bodies:
 
@@ -23,9 +24,9 @@ bodies:
     attractor: /World/Earth
     orbit:
       type: circular
-      radius: 6778000   
+      radius: 6778000.0
       plane: xy
-    scale: 1.0       
+    scale: 1.0
 
   - name: sat2
     prim_path: /World/Sat2
@@ -35,7 +36,7 @@ bodies:
     attractor: /World/Earth
     orbit:
       type: elements
-      a: 6778000
+      a: 6778000.0
       e: 0.01
       inc: 28.5
       raan: 0.0
@@ -46,8 +47,11 @@ bodies:
   - name: sat3
     prim_path: /World/Sat3
     role: cw
+    sensors:
+      lidar: true
+      ir_camera: false
     spawn: true
-    usd: urdf/smallsat/smallsat.usd
+    usd: urdf/smallsat/sensorsat/smallsat_clean.usd
     attractor: /World/Earth
     chief: /World/Sat1
     orbit:

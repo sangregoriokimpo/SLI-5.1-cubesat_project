@@ -2,9 +2,10 @@ import os
 import yaml
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction, TimerAction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
 
 
 def _resolve_config_path(scene_arg: str) -> str:
@@ -29,13 +30,13 @@ def _orbit_params(body: dict, sim_cfg: dict) -> dict:
     return {
         "mu":           sim_cfg.get("mu",           398600.4418),
         "dt_sim":       sim_cfg.get("dt_sim",        0.00833),
-        "publish_rate": float(sim_cfg.get("publish_rate", 30.0)),
+        "publish_rate": sim_cfg.get("publish_rate",  30.0),
         "prim_path":    body["prim_path"],
         "attractor":    body.get("attractor", "/World/Earth"),
         "orbit_type":   orbit.get("type", "circular"),
-        "radius":       float(orbit.get("radius", 6778000)),
+        "radius":       float(orbit.get("radius", 6778.0)),
         "plane":        orbit.get("plane", "xy"),
-        "a":            float(orbit.get("a",    6778000)),
+        "a":            float(orbit.get("a",    6778.0)),
         "e":            float(orbit.get("e",    0.0)),
         "inc":          float(orbit.get("inc",  0.0)),
         "raan":         float(orbit.get("raan", 0.0)),
@@ -43,10 +44,6 @@ def _orbit_params(body: dict, sim_cfg: dict) -> dict:
         "nu":           float(orbit.get("nu",   0.0)),
     }
 
-
-def _rviz_config_path() -> str:
-    pkg_dir = os.path.dirname(__file__)
-    return os.path.join(pkg_dir, "..", "config", "sat3_sensors.rviz")
 
 
 def generate_nodes(context, *args, **kwargs):
@@ -105,9 +102,9 @@ def generate_nodes(context, *args, **kwargs):
                     parameters=[{
                         "mu":           sim_cfg.get("mu",           398600.4418),
                         "dt_sim":       sim_cfg.get("dt_sim",        0.00833),
-                        "publish_rate": float(sim_cfg.get("publish_rate", 30.0)),
+                        "publish_rate": sim_cfg.get("publish_rate",  500.0),
                         "prim_path":    body["prim_path"],
-                        "body_topic":  chief_topic,
+                        "chief_topic":  chief_topic,
                         "dr_x":         float(dr[0]),
                         "dr_y":         float(dr[1]),
                         "dr_z":         float(dr[2]),
@@ -121,7 +118,7 @@ def generate_nodes(context, *args, **kwargs):
         if role in ("orbit", "cw"):
             nodes.append(
                 Node(
-                    package="sli_gnc",
+                    package="sli",
                     executable="isaac_bridge_node",
                     name=f"isaac_bridge_{name}",
                     namespace=name,
@@ -135,52 +132,9 @@ def generate_nodes(context, *args, **kwargs):
                 )
             )
 
-        # if role == "cw":
-        #     sensor_cfg = body.get("sensors", {})
-        #     if sensor_cfg.get("lidar", False) or sensor_cfg.get("ir_camera", False):
-        #         nodes.append(
-        #             TimerAction(
-        #                 period=10.0,
-        #                 actions=[
-        #                     Node(
-        #                         package="sli",
-        #                         executable="sensor_bringup_node",
-        #                         name=f"sensor_bringup_{name}",
-        #                         namespace=name,
-        #                         output="screen",
-        #                         parameters=[{
-        #                             "lidar_parent": body["prim_path"] + "/smallsat/base_link/lidar_link",
-        #                             "frame_id":     f"{name}_lidar",
-        #                             "namespace":    name,
-        #                         }],
-        #                     )
-        #                 ]
-        #             )
-        #         )
-
-    rviz_cfg = _rviz_config_path()
-    rviz_args = ["-d", rviz_cfg] if os.path.exists(rviz_cfg) else []
-    nodes.append(
-            TimerAction(
-                period=8.0,
-                actions=[
-                    Node(
-                        package="rviz2",
-                        executable="rviz2",
-                        name="rviz2",
-                        arguments=rviz_args,
-                        output="screen",
-                        respawn=True,
-                        respawn_delay=3.0,
-                        additional_env={
-                            "FASTRTPS_DEFAULT_PROFILES_FILE": os.path.expanduser("~/fastdds.xml"),
-                        },
-                    )
-                ]
-            )
-        )
-
     return nodes
+
+
 
 
 def generate_launch_description():

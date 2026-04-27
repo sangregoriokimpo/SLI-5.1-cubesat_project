@@ -12,6 +12,8 @@ find_package(orbit_interfaces REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(simulation_interfaces REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,22 +27,41 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(teleop_node src/teleop_node.cpp)
-ament_target_dependencies(teleop_node
+set(DEPS
   rclcpp
   orbit_interfaces
   std_msgs
   simulation_interfaces
 )
-install(TARGETS teleop_node
+
+
+add_executable(teleop_node src/teleop_node.cpp)
+ament_target_dependencies(teleop_node ${DEPS})
+
+add_executable(orbit_vel_node src/orbit_vel_node.cpp)
+ament_target_dependencies(orbit_vel_node ${DEPS})
+target_link_libraries(orbit_vel_node Eigen3::Eigen)
+
+add_executable(cw_node src/cw_node.cpp)
+ament_target_dependencies(cw_node ${DEPS})
+target_link_libraries(cw_node Eigen3::Eigen)
+
+add_executable(isaac_bridge_node src/isaac_bridge_node.cpp)
+ament_target_dependencies(isaac_bridge_node ${DEPS})
+
+install(TARGETS 
+  teleop_node
+  orbit_vel_node
+  cw_node
+  isaac_bridge_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+# if(BUILD_TESTING)
+#   find_package(ament_lint_auto REQUIRED)
+#   set(ament_cmake_copyright_FOUND TRUE)
+#   set(ament_cmake_cpplint_FOUND TRUE)
+#   ament_lint_auto_find_test_dependencies()
+# endif()
 
 ament_package()
