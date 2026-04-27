@@ -63,3 +63,142 @@ static Q4 q_integrate(Q4 q, V3 omega, double dt){
 
 
 }
+
+class CWNode : public rclcpp::Node{
+    public: 
+        CWNode() : Node("cw_node"){
+
+            //DECLARE PARAMETERS
+            declare_parameter("mu",398600.4418);
+            declare_parameter("dt_sim",0.05);
+            declare_parameter("publish_rate",30.0);
+            declare_parameter("prim_path","/World/Sat3");
+            declare_parameter("body_topic","/sat1/orbit_state");
+            declare_parameter("dr_x",1.0);
+            declare_parameter("dr_y",0.0);
+            declare_parameter("dr_z",0.5);
+            declare_parameter("dv_x",0.0);
+            declare_parameter("dv_y",0.001);
+            declare_parameter("dv_z",0.0);
+
+            mu_ = get_parameter("mu").as_double();
+            dt_sim_ = get_parameter("dt_sim").as_double();
+            prim_path_ = get_parameter("prim_path").as_string();
+            body_topic_ = get_parameter("body_topic").as_string();
+            auto publish_rate = get_parameter("publish_rate").as_double();
+
+            rho_ = {get_parameter("dr_x").as_double(),get_parameter("dr_y").as_double(),get_parameter("dr_z").as_double()};
+            rho_dot_ = {get_parameter("dv_x").as_double(),get_parameter("dv_y").as_double(),get_parameter("dv_z").as_double()};
+            pub_ = create_publisher<orbit_interfaces::msg::OrbitState>("orbit_state",10);
+
+            sub_body_ = create_subscription<orbit_interfaces::msg::OrbitState>(
+                body_topic_,10,[this](orbit_interfaces::msg::OrbitState::SharedPtr msg){
+                    r_body_ref_={msg->position.x, msg->position.y, msg->position.z};
+                    v_body_ref_ = {msg->velocity.x,msg->velocity.y,msg->velocity.z};
+                    body_received_ = true;
+                }
+            );
+
+            sub_thrust_ = create_subscription<orbit_interfaces::msg::ThrustCmd>("cmd_thrust",10,
+            [this](orbit_interfaces::msg::ThrustCmd::SharedPtr msg){
+                f_lvlh_={msg->fx, msg->fy, msg-> fz};
+                omega_ = {msg->wx, msg->wy,msg->wz};
+            });
+
+            rclcpp::QoS latch(1);
+            latch.transient_local().reliable();
+            sub_pause_ = create_subscription<std_msgs::msg::Bool>(
+                "/sim_pause",latch,
+                [this](std_msgs::msg::Bool::SharedPtr msg){
+                    if(msg->data != paused_){
+                        paused_ = msg->data;
+                        RCLCPP_INFO(get_logger(),"[%s] %s",prim_path_.c_str(),paused_ ? "PAUSED" : "RESUMED");
+                    }
+                });
+            
+            auto dt_ms = std::chrono::duration<double>(dt_sim_);
+            auto pub_ms = std::chrono::duration<double>(1.0 / publish_rate);
+            integrate_timer_ = create_wall_timer(dt_ms,  [this]() { integrate_step(); });
+            publish_timer_   = create_wall_timer(pub_ms, [this]() { publish_state(); });
+
+            RCLCPP_INFO(get_logger(), "cw_node: %s  body=%s  dt=%.5fs  pub=%.1fHz",prim_path_.c_str(), body_topic_.c_str(), dt_sim_, publish_rate);
+
+
+        }
+    private:
+        double mu_;
+        double dt_sim_;
+        std::string prim_path_;
+        std::string body_topic_;
+        bool paused_ = false;
+        bool body_received_ = false;
+
+        V3 rho_ = V3::Zero();
+        V3 rho_dot_ = V3::Zero();
+        V3 r_body_ref_ = V3::Zero();
+        V3 v_body_ref_ = V3::Zero();
+        Q4 q_ = Q4::Identity();
+        V3 f_lvlh_ = V3::Zero();
+        V3 omega_ = V3::Zero();
+
+        rclcpp::Publisher<orbit_interfaces::msg::OrbitState>::SharedPtr pub_;
+        rclcpp::Subscription<orbit_interfaces::msg::OrbitState>::SharedPtr sub_body_;
+        rclcpp::Subscription<orbit_interfaces::msg::ThrustCmd>::SharedPtr sub_thrust_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_pause_;
+        rclcpp::TimerBase::SharedPtr integrate_timer_;
+        rclcpp::TimerBase::SharedPtr publish_timer_;
+
+        void integrate_step(){
+            if(paused_ || !body_received_){
+                return;
+            }
+            double r_mag = r_body_ref_.norm();
+            if(r_mag < 1e-6){
+                return;
+            }
+            double n = std::sqrt(mu_ / (r_mag*r_mag*r_mag));
+            auto [rn,vn] = cw_rk4_step(n,rho_,rho_dot_,dt_sim_,f_lvlh_);
+            rho_ = rn;
+            rho_dot_ = vn;
+
+            if(omega_.norm() > 1e-12){
+                q_ = q_integrate(q_,omega_,dt_sim_);
+            }
+        }
+
+        void publish_state(){
+            if(paused_ || !body_received_){
+                return;
+            }
+            V3 dr_inertial = lvlh_to_inertial(rho_,r_body_ref_,v_body_ref_);
+            V3 dv_inertial = lvlh_to_inertial(rho_dot_,r_body_ref_,v_body_ref_);
+
+            V3 r_world = r_body_ref_ + dr_inertial;
+            V3 v_world = v_body_ref_ + dv_inertial;
+            auto msg = orbit_interfaces::msg::OrbitState();
+            msg.header.stamp = now();
+            msg.header.frame_id = "world";
+            msg.body_id = prim_path_;
+            msg.position.x = r_world[0];
+            msg.position.y= r_world[1];
+            msg.position.z = r_world[2];
+            msg.velocity.x = v_world[0];
+            msg.velocity.y = v_world[1];
+            msg.velocity.z= v_world[2];
+            msg.attitude.w= q_.w();
+            msg.attitude.x= q_.x();
+            msg.attitude.y= q_.y();
+            msg.attitude.z= q_.z();
+            pub_->publish(msg);
+        }
+    
+
+
+};
+
+int main(int argc, char*argv[]){
+    rclcpp::init(argc,argv);
+    rclcpp::spin(std::make_shared<CWNode>());
+    rclcpp::shutdown();
+    return 0;
+}
