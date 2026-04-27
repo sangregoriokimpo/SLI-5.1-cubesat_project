@@ -107,7 +107,7 @@ def generate_nodes(context, *args, **kwargs):
                         "dt_sim":       sim_cfg.get("dt_sim",        0.00833),
                         "publish_rate": float(sim_cfg.get("publish_rate", 30.0)),
                         "prim_path":    body["prim_path"],
-                        "chief_topic":  chief_topic,
+                        "body_topic":  chief_topic,
                         "dr_x":         float(dr[0]),
                         "dr_y":         float(dr[1]),
                         "dr_z":         float(dr[2]),
@@ -135,7 +135,6 @@ def generate_nodes(context, *args, **kwargs):
                 )
             )
 
-        # Sensor bringup for deputy (cw) body only
         # if role == "cw":
         #     sensor_cfg = body.get("sensors", {})
         #     if sensor_cfg.get("lidar", False) or sensor_cfg.get("ir_camera", False):
@@ -159,7 +158,6 @@ def generate_nodes(context, *args, **kwargs):
         #             )
         #         )
 
-    # RViz2 — delay 8s to let Isaac Sim finish loading
     rviz_cfg = _rviz_config_path()
     rviz_args = ["-d", rviz_cfg] if os.path.exists(rviz_cfg) else []
     nodes.append(
