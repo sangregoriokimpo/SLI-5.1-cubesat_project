@@ -267,9 +267,9 @@ class OrbitVelNode : public rclcpp::Node{
         declare_parameter("publish_rate",30.0);
         declare_parameter("prim_path","/world/Sat");
         declare_parameter("orbit_type","circular");
-        declare_parameter("radius",6778000 );
+        declare_parameter("radius",6778000.0 );
         declare_parameter("plane","xy");
-        declare_parameter("a",6778000 );
+        declare_parameter("a",6778000.0 );
         declare_parameter("e",0.0);
         declare_parameter("inc",0.0);
         declare_parameter("raan",0.0);
@@ -351,9 +351,12 @@ class OrbitVelNode : public rclcpp::Node{
         auto [rn,vn] = rk4_step(mu_, r_,v_, dt_sim_, a_inertial);
         r_ = rn;
         v_ = vn;
+        f_lvlh_ = V3::Zero();
+    
         if (omega_.norm() > 1e-12) {
             q_ = q_integrate(q_, omega_, dt_sim_);
         }
+        omega_ = V3::Zero();
         // if(omega_[0] || omega_[1] || omega_[2]){
         //     q_ = q_integrate(q_,omega_,dt_sim_);
         // }

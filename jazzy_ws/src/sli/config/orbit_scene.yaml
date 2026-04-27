@@ -6,7 +6,7 @@ world:
 
 simulation:
   mu: 398600.4418
-  dt_sim: 0.05
+  dt_sim: 0.005
   publish_rate: 30.0
 
 bodies:
